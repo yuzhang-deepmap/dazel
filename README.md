@@ -52,4 +52,8 @@ The possible parameters to set are:
 * DAZEL_DOCKERFILE="path to the Dockerfile to use to build the dazel image" [Default: "Dockerfile.dazel"]
 * DAZEL_REPOSITORY="the repository to pull the dazel image from" [Default: "dazel"]
 * DAZEL_DIRECTORY="the directory to build the dazel image in" [Default: $PWD]
+* DAZEL_COMMAND="the command to run when building: [Default: "/bazel/output/bazel"]
+* DAZEL_VOLUMES=["<host dir>:<docker dir>", ...] or "<host dir>:<docker dir>,..." [Default: ""]
+* DAZEL_RUN_DEPS=["run_dependency/image_to_load:tag",...] or "another/image:tag,..." [Default: ""]
+* DAZEL_NETWORK="the name of the network on which to load all run dependencies and dazel container" [Default: "dazel"]
 

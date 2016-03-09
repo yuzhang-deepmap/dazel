@@ -69,4 +69,9 @@ DAZEL\_IMAGE\_NAME="name of the dazel image to build or pull" [Default:
 the dazel image" [Default: "Dockerfile.dazel"] \* DAZEL\_REPOSITORY="the
 repository to pull the dazel image from" [Default: "dazel"] \*
 DAZEL\_DIRECTORY="the directory to build the dazel image in" [Default:
-$PWD]
+$PWD] \* DAZEL\_COMMAND="the command to run when building: [Default:
+"/bazel/output/bazel"] \* DAZEL\_VOLUMES=[":", ...] or ":,..." [Default:
+""] \* DAZEL\_RUN\_DEPS=["run\_dependency/image\_to\_load:tag",...] or
+"another/image:tag,..." [Default: ""] \* DAZEL\_NETWORK="the name of the
+network on which to load all run dependencies and dazel container"
+[Default: "dazel"]
