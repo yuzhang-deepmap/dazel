@@ -79,7 +79,7 @@ class DockerInstance:
             return rc
 
         # Run the container itself.
-        print "Starting docker container '%s'..." % self.instance_name
+        print ("Starting docker container '%s'..." % self.instance_name)
         command = "docker stop %s >& /dev/null ; " % (self.instance_name)
         command += "docker rm %s >& /dev/null ; " % (self.instance_name)
         command += "docker run -id --name=%s -w %s %s %s/%s /bin/bash" % (
@@ -91,7 +91,7 @@ class DockerInstance:
 
         # Touch the dazel run file to change the timestamp.
         file(self.dazel_run_file, "w").write(self.instance_name + "\n")
-        print "Done."
+        print ("Done.")
 
         return rc
 
@@ -168,7 +168,8 @@ class DockerInstance:
             return {}
 
         config = {}
-        exec file(dazelrc_path, "r") in config
+        with open(dazelrc_path, "r") as dazelrc:
+            exec(dazelrc.read(), config)
         return config
 
     @classmethod
