@@ -1,5 +1,4 @@
 .dazel_run
 *.egg-info
 *.pyc
-dist/
 build/
