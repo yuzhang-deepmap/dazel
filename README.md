@@ -1,13 +1,14 @@
 # dazel
 Run Google's bazel inside a docker container via a seamless proxy.
 
-bazel is awesome at creating fast and reproducible builds on your own development environemnt.
+bazel is awesome at creating fast and reproducible builds on your own development environment.
 The problem is that it works in an imperfect and non-portable environment.
+
 Enter dazel.
 
 dazel allows you to create your build environment as a Docker image, either via a Dockerfile or a prebuilt repository.
-The tool itself is a simple python script that sends the command line arguments directly to bazel inside the container, and mapping all of the necessary volumes to make it seamless to you.
-It uses the 'docker exec' command to achieve this, and maps the current directory and the bazel-WORKDIR link directory so that the results appear on the host seamlessly.
+The tool itself is a simple python script that sends the command line arguments directly to bazel inside the container, and maps all of the necessary volumes to make it seamless to you.
+It uses the 'docker exec' command to achieve this, and maps the current directory and the bazel-WORKDIR link directory so that the results appear on the host as if you ran the command locally on the host.
 
 It is run the same way you would bazel:
 ```bash
@@ -16,9 +17,9 @@ dazel run //my/cool/package:target
 ```
 
 This was a simple build and run.
-The command line arguments were sent as is into the docker container, and the output was run again inside the container.
+The command line arguments were sent as-is into the docker container, and the output was run in the same manner inside the container.
 
-Running the command for the first time will start the container on it's own, and it will automatically detect if there is need to rebuild or restart the container.
+Running the command for the first time will start the container on it's own, and it will automatically detect if there is need to rebuild or restart the container (if the Dockerfile is newer than the conatiner).
 You can configure anything you need through the ".dazelrc" file in the same directory.
 Take a look at the configuration section for information on how to write one.
 
