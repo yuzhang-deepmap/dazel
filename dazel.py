@@ -18,7 +18,9 @@ DEFAULT_VOLUMES = []
 DEFAULT_RUN_DEPS = []
 DEFAULT_PORTS = []
 DEFAULT_NETWORK = "dazel"
+
 DEFAULT_BAZEL_USER_OUTPUT_ROOT = "%s/.cache/bazel" % os.environ.get("HOME", "~")
+DEFAULT_DOCKER_RUN_PRIVILEGED = False
 
 
 class DockerInstance:
@@ -31,7 +33,8 @@ class DockerInstance:
     
     def __init__(self, instance_name, image_name, dockerfile, repository,
                        directory, command, volumes, run_deps, ports, network,
-                       bazel_user_output_root, dazel_run_file):
+                       bazel_user_output_root, docker_run_privileged,
+                       dazel_run_file):
         self.instance_name = instance_name
         self.image_name = image_name
         self.dockerfile = dockerfile
@@ -40,6 +43,7 @@ class DockerInstance:
         self.command = command
         self.network = network
         self.bazel_user_output_root = bazel_user_output_root
+        self.docker_run_privileged = docker_run_privileged
         self.dazel_run_file = dazel_run_file
 
         self._add_volumes(volumes)
@@ -63,6 +67,8 @@ class DockerInstance:
                 network=config.get("DAZEL_NETWORK", DEFAULT_NETWORK),
                 bazel_user_output_root=config.get("DAZEL_BAZEL_USER_OUTPUT_ROOT",
                                                   DEFAULT_BAZEL_USER_OUTPUT_ROOT),
+                docker_run_privileged=config.get("DAZEL_DOCKER_RUN_PRIVILEGED",
+                                                 DEFAULT_DOCKER_RUN_PRIVILEGED),
                 dazel_run_file=config.get("DAZEL_RUN_FILE", DAZEL_RUN_FILE))
 
     def send_command(self, args):
@@ -162,6 +168,7 @@ class DockerInstance:
                 ports=None,
                 network=self.network,
                 bazel_user_output_root=None,
+                docker_run_privileged=self.docker_run_privileged,
                 dazel_run_file=None)
             if not run_dep_instance.is_running():
                 print ("Starting run dependency: '%s' (name: '%s')" %
@@ -173,8 +180,9 @@ class DockerInstance:
         print ("Starting docker container '%s'..." % self.instance_name)
         command = "docker stop %s >& /dev/null ; " % (self.instance_name)
         command += "docker rm %s >& /dev/null ; " % (self.instance_name)
-        command += "docker run -id --name=%s %s %s %s %s %s%s /bin/bash" % (
+        command += "docker run -id --name=%s %s %s %s %s %s %s%s /bin/bash" % (
             self.instance_name,
+            "--privileged" if self.docker_run_privileged else "",
             ("-w %s" % os.path.realpath(self.directory)) if self.directory else "",
             self.volumes,
             self.ports,

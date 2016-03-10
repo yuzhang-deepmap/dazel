@@ -92,5 +92,10 @@ DAZEL_PORTS=[]
 
 # The name of the network on which to load all run dependencies and dazel container.
 DAZEL_NETWORK="dazel"
+
+# Whether or not to run in privileged mode (fixes bazel sandboxing issues on some
+# systems). Note that this can be a python boolean equivalent, so if setting
+# this from the environment, simply set it to an empty string.
+DAZEL_DOCKER_RUN_PRIVILEGED=False
 ```
 
