@@ -16,6 +16,7 @@ DEFAULT_DIRECTORY = os.getcwd()
 DEFAULT_COMMAND = "/bazel/output/bazel"
 DEFAULT_VOLUMES = []
 DEFAULT_RUN_DEPS = []
+DEFAULT_PORTS = []
 DEFAULT_NETWORK = "dazel"
 DEFAULT_BAZEL_USER_OUTPUT_ROOT = "%s/.cache/bazel" % os.environ.get("HOME", "~")
 
@@ -29,7 +30,7 @@ class DockerInstance:
     """
     
     def __init__(self, instance_name, image_name, dockerfile, repository,
-                       directory, command, volumes, run_deps, network,
+                       directory, command, volumes, run_deps, ports, network,
                        bazel_user_output_root, dazel_run_file):
         self.instance_name = instance_name
         self.image_name = image_name
@@ -43,6 +44,7 @@ class DockerInstance:
 
         self._add_volumes(volumes)
         self._add_run_deps(run_deps)
+        self._add_ports(ports)
         
     @classmethod
     def from_config(cls):
@@ -57,6 +59,7 @@ class DockerInstance:
                 command=config.get("DAZEL_COMMAND", DEFAULT_COMMAND),
                 volumes=config.get("DAZEL_VOLUMES", DEFAULT_VOLUMES),
                 run_deps=config.get("DAZEL_RUN_DEPS", DEFAULT_RUN_DEPS),
+                ports=config.get("DAZEL_PORTS", DEFAULT_PORTS),
                 network=config.get("DAZEL_NETWORK", DEFAULT_NETWORK),
                 bazel_user_output_root=config.get("DAZEL_BAZEL_USER_OUTPUT_ROOT",
                                                   DEFAULT_BAZEL_USER_OUTPUT_ROOT),
@@ -155,6 +158,7 @@ class DockerInstance:
                 command=None,
                 volumes=None,
                 run_deps=None,
+                ports=None,
                 network=self.network,
                 bazel_user_output_root=None,
                 dazel_run_file=None)
@@ -168,10 +172,11 @@ class DockerInstance:
         print ("Starting docker container '%s'..." % self.instance_name)
         command = "docker stop %s >& /dev/null ; " % (self.instance_name)
         command += "docker rm %s >& /dev/null ; " % (self.instance_name)
-        command += "docker run -id --name=%s %s %s %s %s%s /bin/bash" % (
+        command += "docker run -id --name=%s %s %s %s %s %s%s /bin/bash" % (
             self.instance_name,
             ("-w %s" % os.path.realpath(self.directory)) if self.directory else "",
             self.volumes,
+            self.ports,
             ("--net=%s" % self.network) if self.network else "",
             ("%s/" % self.repository) if self.repository else "",
             self.image_name)
@@ -227,7 +232,7 @@ class DockerInstance:
         """Adds the necessary runtime container dependencies to launch."""
         # This can only be intentional in code, so disregard.
         self.run_deps = ""
-        if run_deps is None:
+        if not run_deps:
             return
 
         # DAZEL_RUN_DEPS can be a python iterable or a comma-separated string.
@@ -239,6 +244,23 @@ class DockerInstance:
 
         self.run_deps = [(rd, self. network + "_" + rd.replace("/", "_").replace(":", "_"))
                          for rd in run_deps]
+
+    def _add_ports(self, ports):
+        """Add the given ports to the run string."""
+        # This can only be intentional in code, so ignore None volumes.
+        self.ports = ""
+        if not ports:
+            return
+
+        # DAZEL_PORTS can be a python iterable or a comma-separated string.
+        if isinstance(ports, str):
+            ports = [p.strip() for p in ports.split(",")]
+        elif ports and not isinstance(ports, types.Iterable):
+            raise RuntimeError("DAZEL_PORTS must be comma-separated string "
+                               "or python iterable of strings")
+
+        # Find the real source and output directories.
+        self.ports = '-p "%s"' % '" -p "'.join(ports)
 
     @classmethod
     def _config_from_file(cls):

@@ -4,16 +4,19 @@ dazel
 Run Google's bazel inside a docker container via a seamless proxy.
 
 bazel is awesome at creating fast and reproducible builds on your own
-development environemnt. The problem is that it works in an imperfect
-and non-portable environment. Enter dazel.
+development environment. The problem is that it works in an imperfect
+and non-portable environment.
+
+Enter dazel.
 
 dazel allows you to create your build environment as a Docker image,
 either via a Dockerfile or a prebuilt repository. The tool itself is a
 simple python script that sends the command line arguments directly to
-bazel inside the container, and mapping all of the necessary volumes to
+bazel inside the container, and maps all of the necessary volumes to
 make it seamless to you. It uses the 'docker exec' command to achieve
 this, and maps the current directory and the bazel-WORKDIR link
-directory so that the results appear on the host seamlessly.
+directory so that the results appear on the host as if you ran the
+command locally on the host.
 
 It is run the same way you would bazel:
 
@@ -22,15 +25,16 @@ It is run the same way you would bazel:
     dazel build //my/cool/package/...
     dazel run //my/cool/package:target
 
-This was a simple build and run. The command line arguments were sent as
-is into the docker container, and the output was run again inside the
-container.
+This was a simple build and run. The command line arguments were sent
+as-is into the docker container, and the output was run in the same
+manner inside the container.
 
 Running the command for the first time will start the container on it's
 own, and it will automatically detect if there is need to rebuild or
-restart the container. You can configure anything you need through the
-".dazelrc" file in the same directory. Take a look at the configuration
-section for information on how to write one.
+restart the container (if the Dockerfile is newer than the conatiner).
+You can configure anything you need through the ".dazelrc" file in the
+same directory. Take a look at the configuration section for information
+on how to write one.
 
 Installation
 ------------
@@ -62,16 +66,47 @@ parameters mentioned below.
 Note that specific environment variables supercede the values in the
 .dazelrc file.
 
-The possible parameters to set are: \* DAZEL\_INSTANCE\_NAME="name of
-the docker container to run" [Default: "dazel"] \*
-DAZEL\_IMAGE\_NAME="name of the dazel image to build or pull" [Default:
-"dazel"] \* DAZEL\_DOCKERFILE="path to the Dockerfile to use to build
-the dazel image" [Default: "Dockerfile.dazel"] \* DAZEL\_REPOSITORY="the
-repository to pull the dazel image from" [Default: "dazel"] \*
-DAZEL\_DIRECTORY="the directory to build the dazel image in" [Default:
-$PWD] \* DAZEL\_COMMAND="the command to run when building: [Default:
-"/bazel/output/bazel"] \* DAZEL\_VOLUMES=[":", ...] or ":,..." [Default:
-""] \* DAZEL\_RUN\_DEPS=["run\_dependency/image\_to\_load:tag",...] or
-"another/image:tag,..." [Default: ""] \* DAZEL\_NETWORK="the name of the
-network on which to load all run dependencies and dazel container"
-[Default: "dazel"]
+The possible parameters to set are (with their defaults):
+
+.. code:: python
+
+    # The name of the docker container to run.
+    DAZEL_INSTANCE_NAME="dazel"
+
+    # The name of the dazel image to build or pull.
+    DAZEL_IMAGE_NAME="dazel"
+
+    # The path to the Dockerfile to use to build the dazel image.
+    DAZEL_DOCKERFILE="Dockerfile.dazel"  # in DAZEL_DIRECTORY
+    Default: "Dockerfile.dazel"]
+
+    # The repository to pull the dazel image from.
+    DAZEL_REPOSITORY="dazel"
+
+    # The directory to build the dazel image in.
+    DAZEL_DIRECTORY=$PWD
+
+    # The command to run inside the container.
+    # NOTE: You should add flags to the .bazelrc file instead of here, since it is
+    #       also shared in the volume and it is a much cleaner way.
+    DAZEL_COMMAND="/bazel/output/bazel"
+
+    # Add any additional volumes you want to share between the host and the docker
+    # container, in the normal "hostdir:dockerdir" format.
+    # This can be a python iterable, or a comma-separated string.
+    DAZEL_VOLUMES=[]
+
+    # Add any additional images that you want to run as dependencies and hook up to
+    # the same docker network as the main container.
+    # This is useful if you want to add "postgres" or "rabbitmq" for instance, and
+    # have them run as part of your test environment in a seamless reproducible way.
+    # This can be a python iterable, or a comma-separated string.
+    DAZEL_RUN_DEPS=[]
+
+    # Add any ports you want to publish from the dazel container to the host.
+    # This can be useful if you use the "dazel run //my/cool/webserver/target"
+    # command for example, and need to publish port 80.
+    DAZEL_PORTS=[]
+
+    # The name of the network on which to load all run dependencies and dazel container.
+    DAZEL_NETWORK="dazel"
