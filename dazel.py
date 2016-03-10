@@ -20,6 +20,7 @@ DEFAULT_PORTS = []
 DEFAULT_NETWORK = "dazel"
 
 DEFAULT_BAZEL_USER_OUTPUT_ROOT = "%s/.cache/bazel" % os.environ.get("HOME", "~")
+DEFAULT_BAZEL_RC_FILE = ""
 DEFAULT_DOCKER_RUN_PRIVILEGED = False
 
 
@@ -33,8 +34,8 @@ class DockerInstance:
     
     def __init__(self, instance_name, image_name, dockerfile, repository,
                        directory, command, volumes, run_deps, ports, network,
-                       bazel_user_output_root, docker_run_privileged,
-                       dazel_run_file):
+                       bazel_user_output_root, bazel_rc_file,
+                       docker_run_privileged, dazel_run_file):
         self.instance_name = instance_name
         self.image_name = image_name
         self.dockerfile = dockerfile
@@ -43,6 +44,7 @@ class DockerInstance:
         self.command = command
         self.network = network
         self.bazel_user_output_root = bazel_user_output_root
+        self.bazel_rc_file = bazel_rc_file
         self.docker_run_privileged = docker_run_privileged
         self.dazel_run_file = dazel_run_file
 
@@ -65,6 +67,7 @@ class DockerInstance:
                 run_deps=config.get("DAZEL_RUN_DEPS", DEFAULT_RUN_DEPS),
                 ports=config.get("DAZEL_PORTS", DEFAULT_PORTS),
                 network=config.get("DAZEL_NETWORK", DEFAULT_NETWORK),
+                bazel_rc_file=config.get("DAZEL_BAZEL_RC_FILE", DEFAULT_BAZEL_RC_FILE),
                 bazel_user_output_root=config.get("DAZEL_BAZEL_USER_OUTPUT_ROOT",
                                                   DEFAULT_BAZEL_USER_OUTPUT_ROOT),
                 docker_run_privileged=config.get("DAZEL_DOCKER_RUN_PRIVILEGED",
@@ -72,8 +75,12 @@ class DockerInstance:
                 dazel_run_file=config.get("DAZEL_RUN_FILE", DAZEL_RUN_FILE))
 
     def send_command(self, args):
-        command = "docker exec -it %s %s --output_user_root=%s %s" % (
-            self.instance_name, self.command, self.bazel_user_output_root,
+        command = "docker exec -i %s %s %s %s --output_user_root=%s %s" % (
+            "-t" if sys.stdout.isatty() else "",
+            self.instance_name,
+            self.command,
+            ("--bazelrc=%s" % self.bazel_rc_file) if self.bazel_rc_file else "",
+            self.bazel_user_output_root,
             '"%s"' % '" "'.join(args))
         return os.system(command)
 
@@ -167,6 +174,7 @@ class DockerInstance:
                 run_deps=None,
                 ports=None,
                 network=self.network,
+                bazel_rc_file=None,
                 bazel_user_output_root=None,
                 docker_run_privileged=self.docker_run_privileged,
                 dazel_run_file=None)
