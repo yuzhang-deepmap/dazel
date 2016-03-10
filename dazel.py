@@ -110,13 +110,13 @@ class DockerInstance:
 
     def is_running(self):
         """Checks if the container is currently running."""
-        command = "docker ps | grep \"\\<%s\\>\" >& /dev/null" % (self.instance_name)
+        command = "docker ps | grep \"\\<%s\\>\" >/dev/null 2>&1" % (self.instance_name)
         rc = os.system(command)
         return (rc == 0)
 
     def _image_exists(self):
         """Checks if the dazel image exists in the local repository."""
-        command = "docker images | grep \"\\<%s/%s\\>\" >& /dev/null" % (
+        command = "docker images | grep \"\\<%s/%s\\>\" >/dev/null 2>&1" % (
             self.repository, self.image_name)
         rc = os.system(command)
         return (rc == 0)
@@ -140,7 +140,7 @@ class DockerInstance:
 
     def _network_exists(self):
         """Checks if the network we need to use exists."""
-        command = "docker network ls | grep \"\\<%s\\>\" >& /dev/null" % (
+        command = "docker network ls | grep \"\\<%s\\>\" >/dev/null 2>&1" % (
             self.network)
         rc = os.system(command)
         return (rc == 0)
@@ -178,8 +178,8 @@ class DockerInstance:
     def _run_container(self):
         """Runs the container itself."""
         print ("Starting docker container '%s'..." % self.instance_name)
-        command = "docker stop %s >& /dev/null ; " % (self.instance_name)
-        command += "docker rm %s >& /dev/null ; " % (self.instance_name)
+        command = "docker stop %s >/dev/null 2>&1 ; " % (self.instance_name)
+        command += "docker rm %s >/dev/null 2>&1 ; " % (self.instance_name)
         command += "docker run -id --name=%s %s %s %s %s %s %s%s /bin/bash" % (
             self.instance_name,
             "--privileged" if self.docker_run_privileged else "",
