@@ -98,12 +98,15 @@ The possible parameters to set are (with their defaults):
 
     # Add any additional images that you want to run as dependencies and hook up to
     # the same docker network as the main container.
+    # The format is the standard "repository/image:tag", but you can optionally add
+    # the name of the container to create with "repository/image:tag::container".
     # This is useful if you want to add "postgres" or "rabbitmq" for instance, and
     # have them run as part of your test environment in a seamless reproducible way.
     # This can be a python iterable, or a comma-separated string.
     DAZEL_RUN_DEPS=[]
 
-    # Add any ports you want to publish from the dazel container to the host.
+    # Add any ports you want to publish from the dazel container to the host, in the
+    # normal "interface:dockerport:hostport" (e.g. "0.0.0.0:80:80").
     # This can be useful if you use the "dazel run //my/cool/webserver/target"
     # command for example, and need to publish port 80.
     DAZEL_PORTS=[]

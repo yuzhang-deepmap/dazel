@@ -77,6 +77,8 @@ DAZEL_VOLUMES=[]
 
 # Add any additional images that you want to run as dependencies and hook up to
 # the same docker network as the main container.
+# The format is the standard "repository/image:tag", but you can optionally add
+# the name of the container to create with "repository/image:tag::container".
 # This is useful if you want to add "postgres" or "rabbitmq" for instance, and
 # have them run as part of your test environment in a seamless reproducible way.
 # This can be a python iterable, or a comma-separated string.

@@ -242,8 +242,11 @@ class DockerInstance:
             raise RuntimeError("DAZEL_RUN_DEPS must be comma-separated string "
                                "or python iterable of strings")
 
-        self.run_deps = [(rd, self. network + "_" + rd.replace("/", "_").replace(":", "_"))
-                         for rd in run_deps]
+        def extract_image_and_instance(run_dep):
+            if "::" in run_dep:
+                return tuple(run_dep.split("::"))
+            return (run_dep, self.network + "_" + rd.replace("/", "_").replace(":", "_"))
+        self.run_deps = [extract_image_and_instance(rd) for rd in run_deps]
 
     def _add_ports(self, ports):
         """Add the given ports to the run string."""
