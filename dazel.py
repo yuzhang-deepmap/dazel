@@ -89,6 +89,7 @@ class DockerInstance:
 
         # Setup the network if necessary.
         if not self._network_exists():
+            print ("Creating network: '%s'" % self.network)
             rc = self._start_network()
             if rc:
                 return rc
@@ -245,7 +246,7 @@ class DockerInstance:
         def extract_image_and_instance(run_dep):
             if "::" in run_dep:
                 return tuple(run_dep.split("::"))
-            return (run_dep, self.network + "_" + rd.replace("/", "_").replace(":", "_"))
+            return (run_dep, self.network + "_" + run_dep.replace("/", "_").replace(":", "_"))
         self.run_deps = [extract_image_and_instance(rd) for rd in run_deps]
 
     def _add_ports(self, ports):
