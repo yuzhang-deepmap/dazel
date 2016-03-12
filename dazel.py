@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import hashlib
 import os
 import sys
 import types
@@ -19,7 +20,9 @@ DEFAULT_RUN_DEPS = []
 DEFAULT_PORTS = []
 DEFAULT_NETWORK = "dazel"
 
-DEFAULT_BAZEL_USER_OUTPUT_ROOT = "%s/.cache/bazel" % os.environ.get("HOME", "~")
+DEFAULT_BAZEL_USER_OUTPUT_ROOT = ("%s/.cache/bazel/_bazel_%s" %
+                                  (os.environ.get("HOME", "~"),
+                                   os.environ.get("USER", "user")))
 DEFAULT_BAZEL_RC_FILE = ""
 DEFAULT_DOCKER_RUN_PRIVILEGED = False
 
@@ -75,12 +78,14 @@ class DockerInstance:
                 dazel_run_file=config.get("DAZEL_RUN_FILE", DAZEL_RUN_FILE))
 
     def send_command(self, args):
-        command = "docker exec -i %s %s %s %s --output_user_root=%s %s" % (
+        command = "docker exec -i %s %s %s %s %s %s %s" % (
             "-t" if sys.stdout.isatty() else "",
+            "--privileged" if self.docker_run_privileged else "",
             self.instance_name,
             self.command,
             ("--bazelrc=%s" % self.bazel_rc_file) if self.bazel_rc_file else "",
-            self.bazel_user_output_root,
+            ("--output_user_root=%s" % self.bazel_user_output_root
+             if self.bazel_user_output_root else ""),
             '"%s"' % '" "'.join(args))
         return os.system(command)
 
@@ -224,26 +229,40 @@ class DockerInstance:
 
         # Find the real source and output directories.
         real_directory = os.path.realpath(self.directory)
-        real_bazelout = os.path.realpath(
-            os.path.join(self.directory, "bazel-out", ".."))
         volumes += [
             "%s:%s" % (real_directory, real_directory),
-            "%s:%s" % (real_bazelout, real_bazelout),
         ]
-        self.volumes = '-v "%s"' % '" -v "'.join(volumes)
 
         # If the user hasn't explicitly set a DAZEL_BAZEL_USER_OUTPUT_ROOT for
         # bazel, set it from the output directory so that we get the build
         # results on the host.
+        real_bazelout = os.path.realpath(
+            os.path.join(self.directory, "bazel-out", ".."))
         if not self.bazel_user_output_root and "/_bazel" in real_bazelout:
             parts = real_bazelout.split("/_bazel")
             first_part = parts[0]
             second_part = "/_bazel" + parts[1].split("/")[0]
             self.bazel_user_output_root = first_part + second_part
 
+        # Add the bazel user output directory if it exists, or the real bazelout
+        # directory if it does.
+        if self.bazel_user_output_root:
+            workspace_hex_digest = hashlib.md5(real_directory.encode("ascii")).hexdigest()
+            real_user_output_root = os.path.realpath(
+                os.path.join(self.bazel_user_output_root,
+                             workspace_hex_digest,
+                             os.path.basename(real_directory)))
+            volumes += ["%s:%s" % (real_user_output_root,
+                                   real_user_output_root)]
+        elif real_bazelout:
+            volumes += ["%s:%s" % (real_bazelout, real_bazelout)]
+
         # Make sure the path exists on the host.
-        if not os.path.isdir(self.bazel_user_output_root):
+        if self.bazel_user_output_root and not os.path.isdir(self.bazel_user_output_root):
             os.makedirs(self.bazel_user_output_root)
+
+        # Calculate the volumes string.
+        self.volumes = '-v "%s"' % '" -v "'.join(volumes)
 
     def _add_run_deps(self, run_deps):
         """Adds the necessary runtime container dependencies to launch."""
