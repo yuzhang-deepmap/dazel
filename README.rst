@@ -76,9 +76,12 @@ The possible parameters to set are (with their defaults):
     # The name of the dazel image to build or pull.
     DAZEL_IMAGE_NAME="dazel"
 
+    # The command to run when running the image (the continuous command that will
+    # hold the container active while we connect to it).
+    DAZEL_RUN_COMMAND="/bin/bash"
+
     # The path to the Dockerfile to use to build the dazel image.
     DAZEL_DOCKERFILE="Dockerfile.dazel"  # in DAZEL_DIRECTORY
-    Default: "Dockerfile.dazel"]
 
     # The repository to pull the dazel image from.
     DAZEL_REPOSITORY="dazel"

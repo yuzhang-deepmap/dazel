@@ -11,6 +11,7 @@ DAZEL_RUN_FILE = ".dazel_run"
 
 DEFAULT_INSTANCE_NAME = "dazel"
 DEFAULT_IMAGE_NAME = "dazel"
+DEFAULT_RUN_COMMAND = "/bin/bash"
 DEFAULT_LOCAL_DOCKERFILE = "Dockerfile.dazel"
 DEFAULT_REMOTE_RPOSITORY = "dazel"
 DEFAULT_DIRECTORY = os.getcwd()
@@ -35,12 +36,13 @@ class DockerInstance:
     It streams the output directly and blocks until the command finishes.
     """
     
-    def __init__(self, instance_name, image_name, dockerfile, repository,
-                       directory, command, volumes, run_deps, ports, network,
-                       bazel_user_output_root, bazel_rc_file,
+    def __init__(self, instance_name, image_name, run_command, dockerfile,
+                       repository, directory, command, volumes, run_deps,
+                       ports, network, bazel_user_output_root, bazel_rc_file,
                        docker_run_privileged, dazel_run_file):
         self.instance_name = instance_name
         self.image_name = image_name
+        self.run_command = run_command
         self.dockerfile = dockerfile
         self.repository = repository
         self.directory = directory
@@ -62,6 +64,7 @@ class DockerInstance:
         return DockerInstance(
                 instance_name=config.get("DAZEL_INSTANCE_NAME", DEFAULT_INSTANCE_NAME),
                 image_name=config.get("DAZEL_IMAGE_NAME", DEFAULT_IMAGE_NAME),
+                run_command=config.get("DAZEL_RUN_COMMAND", DEFAULT_RUN_COMMAND),
                 dockerfile=config.get("DAZEL_DOCKERFILE", DEFAULT_LOCAL_DOCKERFILE),
                 repository=config.get("DAZEL_REPOSITORY", DEFAULT_REMOTE_RPOSITORY),
                 directory=config.get("DAZEL_DIRECTORY", DEFAULT_DIRECTORY),
@@ -171,6 +174,7 @@ class DockerInstance:
             run_dep_instance = DockerInstance(
                 instance_name=run_dep_name,
                 image_name=run_dep_image,
+                run_command=None,
                 dockerfile=None,
                 repository=None,
                 directory=None,
@@ -193,7 +197,7 @@ class DockerInstance:
         print ("Starting docker container '%s'..." % self.instance_name)
         command = "docker stop %s >/dev/null 2>&1 ; " % (self.instance_name)
         command += "docker rm %s >/dev/null 2>&1 ; " % (self.instance_name)
-        command += "docker run -id --name=%s %s %s %s %s %s %s%s /bin/bash" % (
+        command += "docker run -id --name=%s %s %s %s %s %s %s%s %s" % (
             self.instance_name,
             "--privileged" if self.docker_run_privileged else "",
             ("-w %s" % os.path.realpath(self.directory)) if self.directory else "",
@@ -201,7 +205,8 @@ class DockerInstance:
             self.ports,
             ("--net=%s" % self.network) if self.network else "",
             ("%s/" % self.repository) if self.repository else "",
-            self.image_name)
+            self.image_name,
+            self.run_command if self.run_command else "")
         rc = os.system(command)
         if rc:
             return rc
