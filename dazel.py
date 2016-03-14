@@ -126,6 +126,10 @@ class DockerInstance:
     def is_running(self):
         """Checks if the container is currently running."""
         command = "docker ps | grep \"\\<%s\\>\" >/dev/null 2>&1" % (self.instance_name)
+        if self.directory:
+            real_directory = os.path.realpath(self.directory)
+            command += (" && docker inspect \"%s\" | grep \"%s:%s\" >/dev/null 2>&1" %
+                        (self.instance_name, real_directory, real_directory))
         rc = os.system(command)
         return (rc == 0)
 
@@ -257,6 +261,8 @@ class DockerInstance:
                 os.path.join(self.bazel_user_output_root,
                              workspace_hex_digest,
                              os.path.basename(real_directory)))
+            if not os.path.isdir(real_user_output_root):
+                os.makedirs(real_user_output_root)
             volumes += ["%s:%s" % (real_user_output_root,
                                    real_user_output_root)]
         elif real_bazelout:
