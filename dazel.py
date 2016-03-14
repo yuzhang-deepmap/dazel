@@ -265,6 +265,15 @@ class DockerInstance:
                 os.makedirs(real_user_output_root)
             volumes += ["%s:%s" % (real_user_output_root,
                                    real_user_output_root)]
+
+            real_user_output_external = os.path.realpath(
+                os.path.join(self.bazel_user_output_root,
+                             workspace_hex_digest,
+                             "external"))
+            if not os.path.isdir(real_user_output_external):
+                os.makedirs(real_user_output_external)
+            volumes += ["%s:%s" % (real_user_output_external,
+                                   real_user_output_external)]
         elif real_bazelout:
             volumes += ["%s:%s" % (real_bazelout, real_bazelout)]
 
