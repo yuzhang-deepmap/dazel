@@ -126,10 +126,23 @@ class DockerInstance:
     def is_running(self):
         """Checks if the container is currently running."""
         command = "docker ps | grep \"\\<%s\\>\" >/dev/null 2>&1" % (self.instance_name)
+
+        # If we have a directory, make sure the running container is mapped to
+        # the same one (if not we need to create a new container mapped to the
+        # correct folder).
         if self.directory:
             real_directory = os.path.realpath(self.directory)
             command += (" && docker inspect \"%s\" | grep \"%s:%s\" >/dev/null 2>&1" %
                         (self.instance_name, real_directory, real_directory))
+
+        # If we have a network, make sure the running container is using the
+        # correct network (if not we need to create a new container on the
+        # correct network).
+        # Note: with proper naming conventions this shouldn't happen much.
+        if self.network:
+            command += (" && docker inspect \"%s\" | grep '\"NetworkMode\": \"%s\"' >/dev/null 2>&1" %
+                        (self.instance_name, self.network))
+            
         rc = os.system(command)
         return (rc == 0)
 
