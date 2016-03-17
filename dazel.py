@@ -17,9 +17,12 @@ DEFAULT_REMOTE_RPOSITORY = "dazel"
 DEFAULT_DIRECTORY = os.getcwd()
 DEFAULT_COMMAND = "/bazel/output/bazel"
 DEFAULT_VOLUMES = []
-DEFAULT_RUN_DEPS = []
 DEFAULT_PORTS = []
 DEFAULT_NETWORK = "dazel"
+DEFAULT_RUN_DEPS = []
+DEFAULT_DOCKER_COMPOSE_FILE = ""
+DEFAULT_DOCKER_COMPOSE_PROJECT_NAME = "dazel"
+DEFAULT_DOCKER_COMPOSE_SERVICES = ""
 
 DEFAULT_BAZEL_USER_OUTPUT_ROOT = ("%s/.cache/bazel/_bazel_%s" %
                                   (os.environ.get("HOME", "~"),
@@ -37,8 +40,9 @@ class DockerInstance:
     """
     
     def __init__(self, instance_name, image_name, run_command, dockerfile,
-                       repository, directory, command, volumes, run_deps,
-                       ports, network, bazel_user_output_root, bazel_rc_file,
+                       repository, directory, command, volumes, ports, network,
+                       run_deps, docker_compose_file, docker_compose_project_name,
+                       docker_compose_services, bazel_user_output_root, bazel_rc_file,
                        docker_run_privileged, dazel_run_file):
         self.instance_name = instance_name
         self.image_name = image_name
@@ -48,14 +52,20 @@ class DockerInstance:
         self.directory = directory
         self.command = command
         self.network = network
+        self.docker_compose_file = docker_compose_file
+        self.docker_compose_project_name = docker_compose_project_name
         self.bazel_user_output_root = bazel_user_output_root
         self.bazel_rc_file = bazel_rc_file
         self.docker_run_privileged = docker_run_privileged
         self.dazel_run_file = dazel_run_file
 
+        if self.docker_compose_file:
+            self.network = "%s_%s" % (docker_compose_project_name, network)
+
         self._add_volumes(volumes)
-        self._add_run_deps(run_deps)
         self._add_ports(ports)
+        self._add_run_deps(run_deps)
+        self._add_compose_services(docker_compose_services)
         
     @classmethod
     def from_config(cls):
@@ -70,9 +80,15 @@ class DockerInstance:
                 directory=config.get("DAZEL_DIRECTORY", DEFAULT_DIRECTORY),
                 command=config.get("DAZEL_COMMAND", DEFAULT_COMMAND),
                 volumes=config.get("DAZEL_VOLUMES", DEFAULT_VOLUMES),
-                run_deps=config.get("DAZEL_RUN_DEPS", DEFAULT_RUN_DEPS),
                 ports=config.get("DAZEL_PORTS", DEFAULT_PORTS),
                 network=config.get("DAZEL_NETWORK", DEFAULT_NETWORK),
+                run_deps=config.get("DAZEL_RUN_DEPS", DEFAULT_RUN_DEPS),
+                docker_compose_file=config.get("DAZEL_DOCKER_COMPOSE_FILE",
+                                               DEFAULT_DOCKER_COMPOSE_FILE),
+                docker_compose_project_name=config.get("DAZEL_DOCKER_COMPOSE_PROJECT_NAME",
+                                                       DEFAULT_DOCKER_COMPOSE_PROJECT_NAME),
+                docker_compose_services=config.get("DAZEL_DOCKER_COMPOSE_SERVICES",
+                                                   DEFAULT_DOCKER_COMPOSE_SERVICES),
                 bazel_rc_file=config.get("DAZEL_BAZEL_RC_FILE", DEFAULT_BAZEL_RC_FILE),
                 bazel_user_output_root=config.get("DAZEL_BAZEL_USER_OUTPUT_ROOT",
                                                   DEFAULT_BAZEL_USER_OUTPUT_ROOT),
@@ -94,6 +110,8 @@ class DockerInstance:
 
     def start(self):
         """Starts the dazel docker container."""
+        rc = 0
+
         # Build or pull the relevant dazel image.
         if os.path.exists(self.dockerfile):
             rc = self._build()
@@ -103,20 +121,25 @@ class DockerInstance:
             # couldn't pull.
             if rc and self._image_exists():
                 rc = 0
-
-        # Handle image creation errors.
         if rc:
             return rc
 
-        # Setup the network if necessary.
-        if not self._network_exists():
-            print ("Creating network: '%s'" % self.network)
-            rc = self._start_network()
+        # If given a docker-compose file, start the services needed to run.
+        if self.docker_compose_file:
+            rc = self._start_compose_services()
+        else:
+            # If not through docker-compose, run the various dependencies as
+            # necessary ourselves.
+
+            # Setup the network if necessary.
+            if not self._network_exists():
+                print ("Creating network: '%s'" % self.network)
+                rc = self._start_network()
             if rc:
                 return rc
 
-        # Setup run dependencies if necessary.
-        rc = self._start_run_deps()
+            # Setup run dependencies if necessary.
+            rc = self._start_run_deps()
         if rc:
             return rc
 
@@ -197,9 +220,12 @@ class DockerInstance:
                 directory=None,
                 command=None,
                 volumes=None,
-                run_deps=None,
                 ports=None,
                 network=self.network,
+                run_deps=None,
+                docker_compose_file=None,
+                docker_compose_project_name=None,
+                docker_compose_services=None,
                 bazel_rc_file=None,
                 bazel_user_output_root=None,
                 docker_run_privileged=self.docker_run_privileged,
@@ -208,6 +234,16 @@ class DockerInstance:
                 print ("Starting run dependency: '%s' (name: '%s')" %
                        (run_dep_image, run_dep_name))
                 run_dep_instance._run_container()
+
+    def _start_compose_services(self):
+        """Starts the docker-compose services."""
+        if not self.docker_compose_file:
+            return 0
+
+        command = "COMPOSE_PROJECT_NAME=%s docker-compose -f %s up -d %s" % (
+            self.docker_compose_project_name, self.docker_compose_file,
+            self.docker_compose_services)
+        return os.system(command)
 
     def _run_container(self):
         """Runs the container itself."""
@@ -297,6 +333,23 @@ class DockerInstance:
         # Calculate the volumes string.
         self.volumes = '-v "%s"' % '" -v "'.join(volumes)
 
+    def _add_ports(self, ports):
+        """Add the given ports to the run string."""
+        # This can only be intentional in code, so ignore None volumes.
+        self.ports = ""
+        if not ports:
+            return
+
+        # DAZEL_PORTS can be a python iterable or a comma-separated string.
+        if isinstance(ports, str):
+            ports = [p.strip() for p in ports.split(",")]
+        elif ports and not isinstance(ports, types.Iterable):
+            raise RuntimeError("DAZEL_PORTS must be comma-separated string "
+                               "or python iterable of strings")
+
+        # Find the real source and output directories.
+        self.ports = '-p "%s"' % '" -p "'.join(ports)
+
     def _add_run_deps(self, run_deps):
         """Adds the necessary runtime container dependencies to launch."""
         # This can only be intentional in code, so disregard.
@@ -317,22 +370,23 @@ class DockerInstance:
             return (run_dep, self.network + "_" + run_dep.replace("/", "_").replace(":", "_"))
         self.run_deps = [extract_image_and_instance(rd) for rd in run_deps]
 
-    def _add_ports(self, ports):
-        """Add the given ports to the run string."""
-        # This can only be intentional in code, so ignore None volumes.
-        self.ports = ""
-        if not ports:
+    def _add_compose_services(self, docker_compose_services):
+        """Add the given services to the docker-compose up string."""
+        # This can only be intentional in code, so ignore None services.
+        self.docker_compose_services = ""
+        if not docker_compose_services:
             return
 
-        # DAZEL_PORTS can be a python iterable or a comma-separated string.
-        if isinstance(ports, str):
-            ports = [p.strip() for p in ports.split(",")]
-        elif ports and not isinstance(ports, types.Iterable):
-            raise RuntimeError("DAZEL_PORTS must be comma-separated string "
+        # DAZEL_DOCKER_COMPOSE_SERVICES can be a python iterable or a
+        # comma-separated string.
+        if isinstance(docker_compose_services, str):
+            docker_compose_services = [s.strip() for s in docker_compose_services.split(",")]
+        elif docker_compose_services and not isinstance(docker_compose_services, types.Iterable):
+            raise RuntimeError("DAZEL_DOCKER_COMPOSE_SERVICES must be comma-separated string "
                                "or python iterable of strings")
 
-        # Find the real source and output directories.
-        self.ports = '-p "%s"' % '" -p "'.join(ports)
+        # Create the actual services string.
+        self.docker_compose_services = " ".join(docker_compose_services)
 
     @classmethod
     def _config_from_file(cls):

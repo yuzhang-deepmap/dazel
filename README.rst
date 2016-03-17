@@ -99,15 +99,6 @@ The possible parameters to set are (with their defaults):
     # This can be a python iterable, or a comma-separated string.
     DAZEL_VOLUMES=[]
 
-    # Add any additional images that you want to run as dependencies and hook up to
-    # the same docker network as the main container.
-    # The format is the standard "repository/image:tag", but you can optionally add
-    # the name of the container to create with "repository/image:tag::container".
-    # This is useful if you want to add "postgres" or "rabbitmq" for instance, and
-    # have them run as part of your test environment in a seamless reproducible way.
-    # This can be a python iterable, or a comma-separated string.
-    DAZEL_RUN_DEPS=[]
-
     # Add any ports you want to publish from the dazel container to the host, in the
     # normal "interface:dockerport:hostport" (e.g. "0.0.0.0:80:80").
     # This can be useful if you use the "dazel run //my/cool/webserver/target"
@@ -115,7 +106,36 @@ The possible parameters to set are (with their defaults):
     DAZEL_PORTS=[]
 
     # The name of the network on which to load all run dependencies and dazel container.
+    # If you are using a docker-compose.yml file to load the environment, this must
+    # be the network name to which all of the necessary dependencies are connected.
     DAZEL_NETWORK="dazel"
+
+    # Add any additional images that you want to run as dependencies and hook up to
+    # the same docker network as the main container.
+    # The format is the standard "repository/image:tag", but you can optionally add
+    # the name of the container to create with "repository/image:tag::container".
+    # This is useful if you want to add "postgres" or "rabbitmq" for instance, and
+    # have them run as part of your test environment in a seamless reproducible way.
+    # This can be a python iterable, or a comma-separated string.
+    # Note: alternatively, you can use a docker-compose.yml file for dependencies.
+    DAZEL_RUN_DEPS=[]
+
+    # Add a docker-compose.yml file here to use it to load any services you want to
+    # launch as part of the environment for running bazel.
+    # This can be a much more complex environment than what is possible using run
+    # dependencies.
+    # Note: you can control both the project name and which services to run with the
+    # variables below.
+    DAZEL_DOCKER_COMPOSE_FILE=""
+
+    # If using a docker-compose.yml file, this will set the COMPOSE_PROJECT_NAME
+    # environment variable and thus the project name.
+    DAZEL_DOCKER_COMPOSE_PROJECT_NAME="dazel"
+
+    # If using a docker-compose.yml file, you can specify the services to run in the
+    # file (and empty string means all services - as in running: docker-compose up).
+    # This can be a python iterable, or a comma-separated string.
+    DAZEL_DOCKER_COMPOSE_SERVICES=""
 
     # Whether or not to run in privileged mode (fixes bazel sandboxing issues on some
     # systems). Note that this can be a python boolean equivalent, so if setting
