@@ -8,6 +8,7 @@ import types
 
 DAZEL_RC_FILE = ".dazelrc"
 DAZEL_RUN_FILE = ".dazel_run"
+BAZEL_WORKSPACE_FILE = "WORKSPACE"
 
 DEFAULT_INSTANCE_NAME = "dazel"
 DEFAULT_IMAGE_NAME = "dazel"
@@ -102,15 +103,21 @@ class DockerInstance:
             "--privileged" if self.docker_run_privileged else "",
             self.instance_name,
             self.command,
-            ("--bazelrc=%s" % self.bazel_rc_file) if self.bazel_rc_file else "",
+            ("--bazelrc=%s" % self.bazel_rc_file
+             if self.bazel_rc_file and self.command else ""),
             ("--output_user_root=%s" % self.bazel_user_output_root
-             if self.bazel_user_output_root else ""),
+             if self.bazel_user_output_root and self.command else ""),
             '"%s"' % '" "'.join(args))
         return os.system(command)
 
     def start(self):
         """Starts the dazel docker container."""
         rc = 0
+
+        # Verify that the docker executable exists.
+        if not self._docker_exists():
+            print ("ERROR: Docker executable could not be found!")
+            return 1
 
         # Build or pull the relevant dazel image.
         if os.path.exists(self.dockerfile):
@@ -125,7 +132,7 @@ class DockerInstance:
             return rc
 
         # If given a docker-compose file, start the services needed to run.
-        if self.docker_compose_file:
+        if self.docker_compose_file and self._docker_compose_exists():
             rc = self._start_compose_services()
         else:
             # If not through docker-compose, run the various dependencies as
@@ -388,19 +395,34 @@ class DockerInstance:
         # Create the actual services string.
         self.docker_compose_services = " ".join(docker_compose_services)
 
+    def _docker_exists(self):
+        """Checks if the basic docker executable exists."""
+        return self._command_exists("docker")
+
+    def _docker_compose_exists(self):
+        """Checks if the docker-compose executable exists."""
+        return self._command_exists("docker-compose")
+
+    def _command_exists(self, cmd):
+        """Checks if a command exists on the system."""
+        command = "which %s >/dev/null 2>&1" % (cmd)
+        rc = os.system(command)
+        return (rc == 0)
+
     @classmethod
     def _config_from_file(cls):
         """Creates a configuration from a .dazelrc file."""
-        directory = os.environ.get("DAZEL_DIRECTORY", DEFAULT_DIRECTORY)
+        directory = cls._find_workspace_directory()
         local_dazelrc_path = os.path.join(directory, DAZEL_RC_FILE)
         dazelrc_path = os.environ.get("DAZEL_RC_FILE", local_dazelrc_path)
 
         if not os.path.exists(dazelrc_path):
-            return {}
+            return { "DAZEL_DIRECTORY": os.environ.get("DAZEL_DIRECTORY", directory) }
 
         config = {}
         with open(dazelrc_path, "r") as dazelrc:
             exec(dazelrc.read(), config)
+        config["DAZEL_DIRECTORY"] = os.environ.get("DAZEL_DIRECTORY", directory)
         return config
 
     @classmethod
@@ -409,6 +431,20 @@ class DockerInstance:
         return { name: value
                  for (name, value) in os.environ.items()
                  if name.startswith("DAZEL_") }
+
+    @classmethod
+    def _find_workspace_directory(cls):
+        """Find the workspace directory.
+
+        This is done by traversing the directory structure from the given dazel
+        directory until we find the WORKSPACE file.
+        """
+        directory = os.path.realpath(os.environ.get(
+                "DAZEL_DIRECTORY", DEFAULT_DIRECTORY))
+        while (directory and directory != "/" and
+               not os.path.exists(os.path.join(directory, BAZEL_WORKSPACE_FILE))):
+            directory = os.path.dirname(directory)
+        return directory
 
 
 def main():
