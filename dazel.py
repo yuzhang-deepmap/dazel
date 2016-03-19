@@ -247,7 +247,13 @@ class DockerInstance:
         if not self.docker_compose_file:
             return 0
 
-        command = "COMPOSE_PROJECT_NAME=%s docker-compose -f %s up -d %s" % (
+        command = "COMPOSE_PROJECT_NAME=%s docker-compose -f %s pull --ignore-pull-failures %s" % (
+            self.docker_compose_project_name, self.docker_compose_file,
+            self.docker_compose_services)
+        command += " && COMPOSE_PROJECT_NAME=%s docker-compose -f %s build %s" % (
+            self.docker_compose_project_name, self.docker_compose_file,
+            self.docker_compose_services)
+        command += " && COMPOSE_PROJECT_NAME=%s docker-compose -f %s up -d %s" % (
             self.docker_compose_project_name, self.docker_compose_file,
             self.docker_compose_services)
         return os.system(command)
