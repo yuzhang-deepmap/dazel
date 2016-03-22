@@ -28,6 +28,9 @@ DEFAULT_DOCKER_COMPOSE_SERVICES = ""
 DEFAULT_BAZEL_USER_OUTPUT_ROOT = ("%s/.cache/bazel/_bazel_%s" %
                                   (os.environ.get("HOME", "~"),
                                    os.environ.get("USER", "user")))
+TEMP_BAZEL_OUTPUT_USER_ROOT = ("/var/bazel/workspace/_bazel_%s" %
+                               os.environ.get("USER", "user"))
+DEFAULT_BAZEL_USER_OUTPUT_PATHS = ["external", "action_cache"]
 DEFAULT_BAZEL_RC_FILE = ""
 DEFAULT_DOCKER_RUN_PRIVILEGED = False
 
@@ -56,6 +59,7 @@ class DockerInstance:
         self.docker_compose_file = docker_compose_file
         self.docker_compose_project_name = docker_compose_project_name
         self.bazel_user_output_root = bazel_user_output_root
+        self.bazel_output_base = ""
         self.bazel_rc_file = bazel_rc_file
         self.docker_run_privileged = docker_run_privileged
         self.dazel_run_file = dazel_run_file
@@ -105,8 +109,12 @@ class DockerInstance:
             self.command,
             ("--bazelrc=%s" % self.bazel_rc_file
              if self.bazel_rc_file and self.command else ""),
-            ("--output_user_root=%s" % self.bazel_user_output_root
-             if self.bazel_user_output_root and self.command else ""),
+            ("--output_user_root=%s --output_base=%s" % (
+                TEMP_BAZEL_OUTPUT_USER_ROOT, self.bazel_output_base)
+             if self.command and self.bazel_output_base
+             else  "--output_user_root=%s" % self.bazel_user_output_root
+                   if self.command and self.bazel_user_output_root
+                   else ""),
             '"%s"' % '" "'.join(args))
         return os.system(command)
 
@@ -319,25 +327,23 @@ class DockerInstance:
         # directory if it does.
         if self.bazel_user_output_root:
             workspace_hex_digest = hashlib.md5(real_directory.encode("ascii")).hexdigest()
-            real_user_output_root = os.path.realpath(
+            self.bazel_output_base = os.path.realpath(
                 os.path.join(self.bazel_user_output_root,
-                             workspace_hex_digest,
-                             os.path.basename(real_directory)))
-            if not os.path.isdir(real_user_output_root):
-                os.makedirs(real_user_output_root)
-            volumes += ["%s:%s" % (real_user_output_root,
-                                   real_user_output_root)]
+                             workspace_hex_digest))
 
-            real_user_output_external = os.path.realpath(
-                os.path.join(self.bazel_user_output_root,
-                             workspace_hex_digest,
-                             "external"))
-            if not os.path.isdir(real_user_output_external):
-                os.makedirs(real_user_output_external)
-            volumes += ["%s:%s" % (real_user_output_external,
-                                   real_user_output_external)]
+            user_output_paths = (DEFAULT_BAZEL_USER_OUTPUT_PATHS +
+                                 [os.path.basename(real_directory)])
+            for user_output_path in user_output_paths:
+              real_user_output_path = os.path.realpath(
+                  os.path.join(self.bazel_output_base,
+                               user_output_path))
+              if not os.path.isdir(real_user_output_path):
+                  os.makedirs(real_user_output_path)
+              volumes += ["%s:%s" % (real_user_output_path,
+                                     real_user_output_path)]
         elif real_bazelout:
             volumes += ["%s:%s" % (real_bazelout, real_bazelout)]
+            self.bazel_output_base = real_bazelout
 
         # Make sure the path exists on the host.
         if self.bazel_user_output_root and not os.path.isdir(self.bazel_user_output_root):
