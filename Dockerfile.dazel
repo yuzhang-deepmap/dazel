@@ -1,25 +1,23 @@
-FROM ubuntu:15.10
+FROM debian:jessie-backports
 
 # Install essential packages.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends \
+ && apt-get -t jessie-backports install -y --no-install-recommends \
       bash-completion \
-      ca-certificates \
       g++ \
       openjdk-8-jdk \
       pkg-config \
       unzip \
-      wget \
       zip \
       zlib1g-dev \
  && rm -rf /var/lib/apt/lists/*
 
-# Update certificates.
-RUN update-ca-certificates -f
-
 # Download and install bazel.
-RUN wget --progress=bar:force -O /root/bazel.deb \
+RUN apt-get update \
+ && apt-get -t jessie-backports install -y --no-install-recommends curl \
+ && curl -Lo /root/bazel.deb \
       https://github.com/bazelbuild/bazel/releases/download/0.2.1/bazel_0.2.1-linux-x86_64.deb \
  && dpkg -i /root/bazel.deb \
- && rm -f /root/bazel.deb
+ && apt-get purge --auto-remove -y curl \
+ && rm -rf /root/bazel.deb /var/lib/apt/lists/*
 
