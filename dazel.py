@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import hashlib
 import os
@@ -116,7 +116,7 @@ class DockerInstance:
                    if self.command and self.bazel_user_output_root
                    else ""),
             '"%s"' % '" "'.join(args))
-        return os.system(command)
+        return os.WEXITSTATUS(os.system(command))
 
     def start(self):
         """Starts the dazel docker container."""
