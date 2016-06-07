@@ -17,7 +17,7 @@ RUN apt-get update \
 RUN apt-get update \
  && apt-get -t jessie-backports install -y --no-install-recommends curl \
  && curl -Lo /root/bazel.deb \ 
-      https://github.com/bazelbuild/bazel/releases/download/0.2.2b/bazel_0.2.2b-linux-x86_64.deb \
+      https://github.com/bazelbuild/bazel/releases/download/0.2.3/bazel_0.2.3-linux-x86_64.deb \
  && dpkg -i /root/bazel.deb \
  && apt-get purge --auto-remove -y curl \
  && rm -rf /root/bazel.deb /var/lib/apt/lists/*
