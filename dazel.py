@@ -30,7 +30,7 @@ DEFAULT_BAZEL_USER_OUTPUT_ROOT = ("%s/.cache/bazel/_bazel_%s" %
                                    os.environ.get("USER", "user")))
 TEMP_BAZEL_OUTPUT_USER_ROOT = ("/var/bazel/workspace/_bazel_%s" %
                                os.environ.get("USER", "user"))
-DEFAULT_BAZEL_USER_OUTPUT_PATHS = ["external", "action_cache"]
+DEFAULT_BAZEL_USER_OUTPUT_PATHS = ["external", "action_cache", "execroot"]
 DEFAULT_BAZEL_RC_FILE = ""
 DEFAULT_DOCKER_RUN_PRIVILEGED = False
 
