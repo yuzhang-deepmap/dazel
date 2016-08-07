@@ -33,6 +33,7 @@ TEMP_BAZEL_OUTPUT_USER_ROOT = ("/var/bazel/workspace/_bazel_%s" %
 DEFAULT_BAZEL_USER_OUTPUT_PATHS = ["external", "action_cache", "execroot"]
 DEFAULT_BAZEL_RC_FILE = ""
 DEFAULT_DOCKER_RUN_PRIVILEGED = False
+DEFAULT_DOCKER_MACHINE = None
 
 
 class DockerInstance:
@@ -47,7 +48,7 @@ class DockerInstance:
                        repository, directory, command, volumes, ports, network,
                        run_deps, docker_compose_file, docker_compose_project_name,
                        docker_compose_services, bazel_user_output_root, bazel_rc_file,
-                       docker_run_privileged, dazel_run_file):
+                       docker_run_privileged, docker_machine, dazel_run_file):
         self.instance_name = instance_name
         self.image_name = image_name
         self.run_command = run_command
@@ -62,6 +63,7 @@ class DockerInstance:
         self.bazel_output_base = ""
         self.bazel_rc_file = bazel_rc_file
         self.docker_run_privileged = docker_run_privileged
+        self.docker_machine = docker_machine
         self.dazel_run_file = dazel_run_file
 
         if self.docker_compose_file:
@@ -99,6 +101,8 @@ class DockerInstance:
                                                   DEFAULT_BAZEL_USER_OUTPUT_ROOT),
                 docker_run_privileged=config.get("DAZEL_DOCKER_RUN_PRIVILEGED",
                                                  DEFAULT_DOCKER_RUN_PRIVILEGED),
+                docker_machine=config.get("DAZEL_DOCKER_MACHINE",
+                                          DEFAULT_DOCKER_MACHINE),
                 dazel_run_file=config.get("DAZEL_RUN_FILE", DAZEL_RUN_FILE))
 
     def send_command(self, args):
@@ -116,6 +120,7 @@ class DockerInstance:
                    if self.command and self.bazel_user_output_root
                    else ""),
             '"%s"' % '" "'.join(args))
+        command = self._with_docker_machine(command)
         return os.WEXITSTATUS(os.system(command))
 
     def start(self):
@@ -164,6 +169,7 @@ class DockerInstance:
     def is_running(self):
         """Checks if the container is currently running."""
         command = "docker ps | grep \"\\<%s\\>\" >/dev/null 2>&1" % (self.instance_name)
+        command = self._with_docker_machine(command)
 
         # If we have a directory, make sure the running container is mapped to
         # the same one (if not we need to create a new container mapped to the
@@ -188,6 +194,7 @@ class DockerInstance:
         """Checks if the dazel image exists in the local repository."""
         command = "docker images | grep \"\\<%s/%s\\>\" >/dev/null 2>&1" % (
             self.repository, self.image_name)
+        command = self._with_docker_machine(command)
         rc = os.system(command)
         return (rc == 0)
 
@@ -198,6 +205,7 @@ class DockerInstance:
 
         command = "docker build -t %s/%s -f %s %s" % (
             self.repository, self.image_name, self.dockerfile, self.directory)
+        command = self._with_docker_machine(command)
         return os.system(command)
 
     def _pull(self):
@@ -206,12 +214,14 @@ class DockerInstance:
             raise RuntimeError("No repository to pull the dazel image from.")
 
         command = "docker pull %s/%s" % (self.repository, self.image_name)
+        command = self._with_docker_machine(command)
         return os.system(command)
 
     def _network_exists(self):
         """Checks if the network we need to use exists."""
         command = "docker network ls | grep \"\\<%s\\>\" >/dev/null 2>&1" % (
             self.network)
+        command = self._with_docker_machine(command)
         rc = os.system(command)
         return (rc == 0)
 
@@ -221,6 +231,7 @@ class DockerInstance:
             return 0
 
         command = "docker network create %s" % self.network
+        command = self._with_docker_machine(command)
         return os.system(command)
 
     def _start_run_deps(self):
@@ -244,6 +255,7 @@ class DockerInstance:
                 bazel_rc_file=None,
                 bazel_user_output_root=None,
                 docker_run_privileged=self.docker_run_privileged,
+                docker_machine=self.docker_machine,
                 dazel_run_file=None)
             if not run_dep_instance.is_running():
                 print ("Starting run dependency: '%s' (name: '%s')" %
@@ -264,6 +276,7 @@ class DockerInstance:
         command += " && COMPOSE_PROJECT_NAME=%s docker-compose -f %s up -d %s" % (
             self.docker_compose_project_name, self.docker_compose_file,
             self.docker_compose_services)
+        command = self._with_docker_machine(command)
         return os.system(command)
 
     def _run_container(self):
@@ -281,6 +294,7 @@ class DockerInstance:
             ("%s/" % self.repository) if self.repository else "",
             self.image_name,
             self.run_command if self.run_command else "")
+        command = self._with_docker_machine(command)
         rc = os.system(command)
         if rc:
             return rc
@@ -420,6 +434,11 @@ class DockerInstance:
         command = "which %s >/dev/null 2>&1" % (cmd)
         rc = os.system(command)
         return (rc == 0)
+
+    def _with_docker_machine(self, cmd):
+        if self.docker_machine is None:
+            return cmd
+        return "eval $(docker-machine env %s) && (%s)" % (self.docker_machine, cmd)
 
     @classmethod
     def _config_from_file(cls):
