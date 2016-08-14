@@ -1,24 +1,20 @@
 FROM debian:jessie-backports
 MAINTAINER Nadir Izrael nadir.izr@gmail.com
 
-# Install essential packages.
-RUN apt-get update \
- && apt-get -t jessie-backports install -y --no-install-recommends \
-      bash-completion \
-      g++ \
-      openjdk-8-jdk \
-      pkg-config \
-      unzip \
-      zip \
-      zlib1g-dev \
- && rm -rf /var/lib/apt/lists/*
+ENV BAZEL_VERSION 0.3.1
 
-# Download and install bazel.
+RUN echo 'APT::Install-Recommends "false";' >> /etc/apt/apt.conf.d/99_norecommends \
+ && echo 'APT::AutoRemove::RecommendsImportant "false";' >> /etc/apt/apt.conf.d/99_norecommends \
+ && echo 'APT::AutoRemove::SuggestsImportant "false";' >> /etc/apt/apt.conf.d/99_norecommends
+
 RUN apt-get update \
- && apt-get -t jessie-backports install -y --no-install-recommends curl \
- && curl -Lo /root/bazel.deb \ 
-      https://github.com/bazelbuild/bazel/releases/download/0.3.0/bazel_0.3.0-linux-x86_64.deb \
- && dpkg -i /root/bazel.deb \
+ && apt-get install -y --no-install-recommends ca-certificates curl \
+ && echo "deb [arch=amd64] http://storage.googleapis.com/bazel-apt stable jdk1.8" > \
+         /etc/apt/sources.list.d/bazel.list \
+ && curl https://storage.googleapis.com/bazel-apt/doc/apt-key.pub.gpg | apt-key add - \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends bazel=${BAZEL_VERSION} \
  && apt-get purge --auto-remove -y curl \
- && rm -rf /root/bazel.deb /var/lib/apt/lists/*
+ && rm -rf /etc/apt/sources.list.d/bazel.list \
+ && rm -rf /var/lib/apt/lists/*
 
