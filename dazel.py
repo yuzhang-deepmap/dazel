@@ -273,7 +273,7 @@ class DockerInstance:
         command += " && COMPOSE_PROJECT_NAME=%s docker-compose -f %s build %s" % (
             self.docker_compose_project_name, self.docker_compose_file,
             self.docker_compose_services)
-        command += " && COMPOSE_PROJECT_NAME=%s docker-compose -f %s up -d %s" % (
+        command += " && COMPOSE_PROJECT_NAME=%s docker-compose -f %s up --force-recreate -d %s" % (
             self.docker_compose_project_name, self.docker_compose_file,
             self.docker_compose_services)
         command = self._with_docker_machine(command)
