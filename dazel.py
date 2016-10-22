@@ -143,7 +143,7 @@ class DockerInstance:
         else:
             # If we have the image, don't stop everything just because we
             # couldn't pull.
-            if not self._pull and not self._image_exists():
+            if not self._pull() and not self._image_exists():
                 return False
 
         # If given a docker-compose file, start the services needed to run.
