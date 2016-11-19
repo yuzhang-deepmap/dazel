@@ -49,8 +49,11 @@ class DockerInstance:
                        run_deps, docker_compose_file, docker_compose_project_name,
                        docker_compose_services, bazel_user_output_root, bazel_rc_file,
                        docker_run_privileged, docker_machine, dazel_run_file):
-        self.instance_name = instance_name
-        self.image_name = image_name
+        real_directory = os.path.realpath(directory)
+        self.workspace_hex_digest = hashlib.md5(real_directory.encode("ascii")).hexdigest()
+
+        self.instance_name = "%s_%s" % (instance_name, self.workspace_hex_digest)
+        self.image_name = "%s_%s" % (image_name, self.workspace_hex_digest)
         self.run_command = run_command
         self.dockerfile = dockerfile
         self.repository = repository
@@ -58,7 +61,8 @@ class DockerInstance:
         self.command = command
         self.network = network
         self.docker_compose_file = docker_compose_file
-        self.docker_compose_project_name = docker_compose_project_name
+        self.docker_compose_project_name = "%s%s" % (docker_compose_project_name,
+                                                     self.workspace_hex_digest)
         self.bazel_user_output_root = bazel_user_output_root
         self.bazel_output_base = ""
         self.bazel_rc_file = bazel_rc_file
@@ -67,7 +71,7 @@ class DockerInstance:
         self.dazel_run_file = dazel_run_file
 
         if self.docker_compose_file:
-            self.network = "%s_%s" % (docker_compose_project_name, network)
+            self.network = "%s_%s" % (self.docker_compose_project_name, network)
 
         self._add_volumes(volumes)
         self._add_ports(ports)
@@ -340,10 +344,9 @@ class DockerInstance:
         # Add the bazel user output directory if it exists, or the real bazelout
         # directory if it does.
         if self.bazel_user_output_root:
-            workspace_hex_digest = hashlib.md5(real_directory.encode("ascii")).hexdigest()
             self.bazel_output_base = os.path.realpath(
                 os.path.join(self.bazel_user_output_root,
-                             workspace_hex_digest))
+                             self.workspace_hex_digest))
 
             user_output_paths = (DEFAULT_BAZEL_USER_OUTPUT_PATHS +
                                  [os.path.basename(real_directory)])
