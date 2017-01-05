@@ -34,6 +34,7 @@ DEFAULT_BAZEL_USER_OUTPUT_PATHS = ["external", "action_cache", "execroot"]
 DEFAULT_BAZEL_RC_FILE = ""
 DEFAULT_DOCKER_RUN_PRIVILEGED = False
 DEFAULT_DOCKER_MACHINE = None
+DEFAULT_WORKSPACE_HEX = False
 
 
 class DockerInstance:
@@ -43,17 +44,16 @@ class DockerInstance:
     set it up through configuration variables, and pass on commands to it.
     It streams the output directly and blocks until the command finishes.
     """
-    
+
     def __init__(self, instance_name, image_name, run_command, dockerfile,
                        repository, directory, command, volumes, ports, network,
                        run_deps, docker_compose_file, docker_compose_project_name,
                        docker_compose_services, bazel_user_output_root, bazel_rc_file,
-                       docker_run_privileged, docker_machine, dazel_run_file):
+                       docker_run_privileged, docker_machine, dazel_run_file, workspace_hex):
         real_directory = os.path.realpath(directory)
-        self.workspace_hex_digest = hashlib.md5(real_directory.encode("ascii")).hexdigest()
-
-        self.instance_name = "%s_%s" % (instance_name, self.workspace_hex_digest)
-        self.image_name = "%s_%s" % (image_name, self.workspace_hex_digest)
+        self.workspace_hex_digest = ""
+        self.instance_name = instance_name
+        self.image_name = image_name
         self.run_command = run_command
         self.dockerfile = dockerfile
         self.repository = repository
@@ -61,14 +61,21 @@ class DockerInstance:
         self.command = command
         self.network = network
         self.docker_compose_file = docker_compose_file
-        self.docker_compose_project_name = "%s%s" % (docker_compose_project_name,
-                                                     self.workspace_hex_digest)
+        self.docker_compose_project_name = docker_compose_project_name
         self.bazel_user_output_root = bazel_user_output_root
         self.bazel_output_base = ""
         self.bazel_rc_file = bazel_rc_file
         self.docker_run_privileged = docker_run_privileged
         self.docker_machine = docker_machine
         self.dazel_run_file = dazel_run_file
+
+        if workspace_hex:
+            self.workspace_hex_digest = hashlib.md5(real_directory.encode("ascii")).hexdigest()
+            self.instance_name = "%s_%s" % (self.instance_name, self.workspace_hex_digest)
+            self.docker_compose_project_name = "%s%s" % (self.docker_compose_project_name,
+                                                         self.workspace_hex_digest)
+            if os.path.exists(self.dockerfile):
+                self.image_name = "%s_%s" % (self.image_name, self.workspace_hex_digest)
 
         if self.docker_compose_file:
             self.network = "%s_%s" % (self.docker_compose_project_name, network)
@@ -77,7 +84,7 @@ class DockerInstance:
         self._add_ports(ports)
         self._add_run_deps(run_deps)
         self._add_compose_services(docker_compose_services)
-        
+
     @classmethod
     def from_config(cls):
         config = cls._config_from_file()
@@ -107,7 +114,9 @@ class DockerInstance:
                                                  DEFAULT_DOCKER_RUN_PRIVILEGED),
                 docker_machine=config.get("DAZEL_DOCKER_MACHINE",
                                           DEFAULT_DOCKER_MACHINE),
-                dazel_run_file=config.get("DAZEL_RUN_FILE", DAZEL_RUN_FILE))
+                dazel_run_file=config.get("DAZEL_RUN_FILE", DAZEL_RUN_FILE),
+                workspace_hex=config.get("DAZEL_WORKSPACE_HEX",
+                                          DEFAULT_WORKSPACE_HEX))
 
     def send_command(self, args):
         command = "docker exec -i %s %s %s %s %s %s %s" % (
@@ -190,7 +199,7 @@ class DockerInstance:
         if self.network:
             command += (" && docker inspect \"%s\" | grep '\"NetworkMode\": \"%s\"' >/dev/null 2>&1" %
                         (self.instance_name, self.network))
-            
+
         rc = os.system(command)
         return (rc == 0)
 
