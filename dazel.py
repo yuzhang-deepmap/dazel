@@ -72,9 +72,10 @@ class DockerInstance:
         if workspace_hex:
             self.workspace_hex_digest = hashlib.md5(real_directory.encode("ascii")).hexdigest()
             self.instance_name = "%s_%s" % (self.instance_name, self.workspace_hex_digest)
-            self.image_name = "%s_%s" % (self.image_name, self.workspace_hex_digest)
             self.docker_compose_project_name = "%s%s" % (self.docker_compose_project_name,
                                                          self.workspace_hex_digest)
+            if os.path.exists(self.dockerfile):
+                self.image_name = "%s_%s" % (self.image_name, self.workspace_hex_digest)
 
         if self.docker_compose_file:
             self.network = "%s_%s" % (self.docker_compose_project_name, network)
