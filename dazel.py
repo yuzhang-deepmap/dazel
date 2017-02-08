@@ -14,7 +14,7 @@ DEFAULT_INSTANCE_NAME = "dazel"
 DEFAULT_IMAGE_NAME = "dazel"
 DEFAULT_RUN_COMMAND = "/bin/bash"
 DEFAULT_LOCAL_DOCKERFILE = "Dockerfile.dazel"
-DEFAULT_REMOTE_RPOSITORY = "dazel"
+DEFAULT_REMOTE_REPOSITORY = "dazel"
 DEFAULT_DIRECTORY = os.getcwd()
 DEFAULT_COMMAND = "/usr/bin/bazel"
 DEFAULT_VOLUMES = []
@@ -24,6 +24,7 @@ DEFAULT_RUN_DEPS = []
 DEFAULT_DOCKER_COMPOSE_FILE = ""
 DEFAULT_DOCKER_COMPOSE_PROJECT_NAME = "dazel"
 DEFAULT_DOCKER_COMPOSE_SERVICES = ""
+DEFAULT_FORCE_IMAGE_PULL = False
 
 DEFAULT_BAZEL_USER_OUTPUT_ROOT = ("%s/.cache/bazel/_bazel_%s" %
                                   (os.environ.get("HOME", "~"),
@@ -48,8 +49,9 @@ class DockerInstance:
     def __init__(self, instance_name, image_name, run_command, dockerfile,
                        repository, directory, command, volumes, ports, network,
                        run_deps, docker_compose_file, docker_compose_project_name,
-                       docker_compose_services, bazel_user_output_root, bazel_rc_file,
-                       docker_run_privileged, docker_machine, dazel_run_file, workspace_hex):
+                       docker_compose_services, force_image_pull, bazel_user_output_root,
+                       bazel_rc_file, docker_run_privileged, docker_machine, dazel_run_file,
+                       workspace_hex):
         real_directory = os.path.realpath(directory)
         self.workspace_hex_digest = ""
         self.instance_name = instance_name
@@ -62,6 +64,7 @@ class DockerInstance:
         self.network = network
         self.docker_compose_file = docker_compose_file
         self.docker_compose_project_name = docker_compose_project_name
+        self.force_image_pull = force_image_pull
         self.bazel_user_output_root = bazel_user_output_root
         self.bazel_output_base = ""
         self.bazel_rc_file = bazel_rc_file
@@ -94,7 +97,7 @@ class DockerInstance:
                 image_name=config.get("DAZEL_IMAGE_NAME", DEFAULT_IMAGE_NAME),
                 run_command=config.get("DAZEL_RUN_COMMAND", DEFAULT_RUN_COMMAND),
                 dockerfile=config.get("DAZEL_DOCKERFILE", DEFAULT_LOCAL_DOCKERFILE),
-                repository=config.get("DAZEL_REPOSITORY", DEFAULT_REMOTE_RPOSITORY),
+                repository=config.get("DAZEL_REPOSITORY", DEFAULT_REMOTE_REPOSITORY),
                 directory=config.get("DAZEL_DIRECTORY", DEFAULT_DIRECTORY),
                 command=config.get("DAZEL_COMMAND", DEFAULT_COMMAND),
                 volumes=config.get("DAZEL_VOLUMES", DEFAULT_VOLUMES),
@@ -107,6 +110,8 @@ class DockerInstance:
                                                        DEFAULT_DOCKER_COMPOSE_PROJECT_NAME),
                 docker_compose_services=config.get("DAZEL_DOCKER_COMPOSE_SERVICES",
                                                    DEFAULT_DOCKER_COMPOSE_SERVICES),
+                force_image_pull=config.get("DAZEL_FORCE_IMAGE_PULL",
+                                            DEFAULT_FORCE_IMAGE_PULL),
                 bazel_rc_file=config.get("DAZEL_BAZEL_RC_FILE", DEFAULT_BAZEL_RC_FILE),
                 bazel_user_output_root=config.get("DAZEL_BAZEL_USER_OUTPUT_ROOT",
                                                   DEFAULT_BAZEL_USER_OUTPUT_ROOT),
@@ -216,8 +221,14 @@ class DockerInstance:
         if not os.path.exists(self.dockerfile):
             raise RuntimeError("No Dockerfile to build the dazel image from.")
 
-        command = "docker build -t %s/%s -f %s %s" % (
-            self.repository, self.image_name, self.dockerfile, self.directory)
+        if self.force_image_pull:
+            self._pull()
+
+        command = "docker build -t %s/%s %s -f %s %s" % (
+            self.repository, self.image_name,
+            ("--cache-from=%s/%s" % (self.repository, self.image_name)
+             if self._cache_from_option_exists() and self._image_exists() else ""),
+            self.dockerfile, self.directory)
         command = self._with_docker_machine(command)
         return os.system(command)
 
@@ -444,6 +455,12 @@ class DockerInstance:
     def _command_exists(self, cmd):
         """Checks if a command exists on the system."""
         command = "which %s >/dev/null 2>&1" % (cmd)
+        rc = os.system(command)
+        return (rc == 0)
+
+    def _cache_from_option_exists(self):
+        command = "docker build --help | grep -q cache-from"
+        command = self._with_docker_machine(command)
         rc = os.system(command)
         return (rc == 0)
 

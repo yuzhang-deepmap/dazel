@@ -116,6 +116,10 @@ DAZEL_DOCKER_COMPOSE_PROJECT_NAME="dazel"
 # This can be a python iterable, or a comma-separated string.
 DAZEL_DOCKER_COMPOSE_SERVICES=""
 
+# Auto pull the image from the registry before the build. It helps for faster
+# builds if the layers are cached.
+DAZEL_FORCE_IMAGE_PULL=False
+
 # Whether or not to run in privileged mode (fixes bazel sandboxing issues on some
 # systems). Note that this can be a python boolean equivalent, so if setting
 # this from the environment, simply set it to an empty string.
