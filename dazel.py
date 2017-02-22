@@ -3,6 +3,8 @@
 import hashlib
 import os
 import sys
+import tarfile
+import tempfile
 import types
 
 
@@ -216,6 +218,22 @@ class DockerInstance:
         rc = os.system(command)
         return (rc == 0)
 
+    def _tar(self):
+        """Create tar file with the context of the directory"""
+        def reset(tarinfo):
+            tarinfo.uid = tarinfo.gid = 0
+            tarinfo.uname = tarinfo.gname = "root"
+            return tarinfo
+
+        last_cwd = os.getcwd()
+        os.chdir(self.directory)
+        fp = tempfile.NamedTemporaryFile()
+        tar = tarfile.open("", "w|", fileobj=fp)
+        tar.add(".", filter=reset)
+        tar.close()
+        os.chdir(last_cwd)
+        return fp
+
     def _build(self):
         """Builds the dazel image from the local dockerfile."""
         if not os.path.exists(self.dockerfile):
@@ -224,13 +242,16 @@ class DockerInstance:
         if self.force_image_pull:
             self._pull()
 
-        command = "docker build -t %s/%s %s -f %s %s" % (
-            self.repository, self.image_name,
-            ("--cache-from=%s/%s" % (self.repository, self.image_name)
-             if self._cache_from_option_exists() and self._image_exists() else ""),
-            self.dockerfile, self.directory)
-        command = self._with_docker_machine(command)
-        return os.system(command)
+        with self._tar() as tar:
+            command = "docker build -t %s/%s %s -f %s - < %s" % (
+                self.repository, self.image_name,
+                ("--cache-from=%s/%s" % (self.repository, self.image_name)
+                 if self._cache_from_option_exists() and self._image_exists() else ""),
+                self.dockerfile, tar.name)
+            command = self._with_docker_machine(command)
+            rc = os.system(command)
+
+        return rc
 
     def _pull(self):
         """Pulls the relevant image from the dockerhub repository."""
