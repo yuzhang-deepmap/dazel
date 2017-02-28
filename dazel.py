@@ -234,6 +234,16 @@ class DockerInstance:
         os.chdir(last_cwd)
         return fp
 
+    def _latest_image(self):
+        command = "docker images -q %s/%s -f 'since=%s/%s:latest' | head -1" % (
+            self.repository, self.image_name,
+            self.repository, self.image_name)
+        command = self._with_docker_machine(command)
+        image = os.popen(command).read()
+        image = image.strip()
+
+        return image or "%s/%s:latest" % (self.repository, self.image_name)
+
     def _build(self):
         """Builds the dazel image from the local dockerfile."""
         if not os.path.exists(self.dockerfile):
@@ -245,9 +255,12 @@ class DockerInstance:
         with self._tar() as tar:
             command = "docker build -t %s/%s %s -f %s - < %s" % (
                 self.repository, self.image_name,
-                ("--cache-from=%s/%s" % (self.repository, self.image_name)
+                ("--cache-from=%s" % (self._latest_image(), )
                  if self._cache_from_option_exists() and self._image_exists() else ""),
                 self.dockerfile, tar.name)
+            command += " && docker tag %s/%s:latest %s/%s:latest_build" % (
+                self.repository, self.image_name,
+                self.repository, self.image_name)
             command = self._with_docker_machine(command)
             rc = os.system(command)
 
