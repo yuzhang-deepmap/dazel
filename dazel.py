@@ -7,6 +7,7 @@ import tarfile
 import tempfile
 import types
 
+from docker.utils import exclude_paths
 
 DAZEL_RC_FILE = ".dazelrc"
 DAZEL_RUN_FILE = ".dazel_run"
@@ -220,17 +221,41 @@ class DockerInstance:
 
     def _tar(self):
         """Create tar file with the context of the directory"""
-        def reset(tarinfo):
-            tarinfo.uid = tarinfo.gid = 0
-            tarinfo.uname = tarinfo.gname = "root"
-            return tarinfo
-
+        # Change dir to directory
         last_cwd = os.getcwd()
         os.chdir(self.directory)
+
+        # Create new tar file
         fp = tempfile.NamedTemporaryFile()
-        tar = tarfile.open("", "w|", fileobj=fp)
-        tar.add(".", filter=reset)
+        tar = tarfile.open("", "w", fileobj=fp)
+
+        # Read .dockerignroe for excludes
+        excludes = open("%s/.dockerignore" % self.directory, "r+").readlines()
+        excludes = [line.rstrip() for line in excludes]
+
+        # Add each file to the tar file
+        for path in sorted(exclude_paths(".", excludes)):
+            tarinfo = tar.gettarinfo("./%s" % path)
+            if tarinfo is None:
+                # This happens when we encounter a socket file. We can safely
+                # ignore it and proceed.
+                continue
+
+            # Change the owner of the file to root
+            tarinfo.uid = tarinfo.gid = 0
+            tarinfo.uname = tarinfo.gname = "root"
+
+            try:
+                # We open the file object in binary mode for Windows support.
+                with open(path, 'rb') as f:
+                    tar.addfile(tarinfo, f)
+            except IOError:
+                # When we encounter a directory the file object is set to None.
+                tar.addfile(tarinfo, None)
+
+        # Close, change dir back to previous, and return the tar file
         tar.close()
+        fp.seek(0)
         os.chdir(last_cwd)
         return fp
 
@@ -255,7 +280,7 @@ class DockerInstance:
         with self._tar() as tar:
             command = "docker build -t %s/%s %s -f %s - < %s" % (
                 self.repository, self.image_name,
-                ("--cache-from=%s" % (self._latest_image(), )
+                ("--cache-from=%s" % self._latest_image()
                  if self._cache_from_option_exists() and self._image_exists() else ""),
                 self.dockerfile, tar.name)
             command += " && docker tag %s/%s:latest %s/%s:latest_build" % (
