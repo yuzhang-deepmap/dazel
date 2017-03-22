@@ -14,7 +14,7 @@ DEFAULT_INSTANCE_NAME = "dazel"
 DEFAULT_IMAGE_NAME = "dazel"
 DEFAULT_RUN_COMMAND = "/bin/bash"
 DEFAULT_LOCAL_DOCKERFILE = "Dockerfile.dazel"
-DEFAULT_REMOTE_RPOSITORY = "dazel"
+DEFAULT_REMOTE_REPOSITORY = "dazel"
 DEFAULT_DIRECTORY = os.getcwd()
 DEFAULT_COMMAND = "/usr/bin/bazel"
 DEFAULT_VOLUMES = []
@@ -94,7 +94,7 @@ class DockerInstance:
                 image_name=config.get("DAZEL_IMAGE_NAME", DEFAULT_IMAGE_NAME),
                 run_command=config.get("DAZEL_RUN_COMMAND", DEFAULT_RUN_COMMAND),
                 dockerfile=config.get("DAZEL_DOCKERFILE", DEFAULT_LOCAL_DOCKERFILE),
-                repository=config.get("DAZEL_REPOSITORY", DEFAULT_REMOTE_RPOSITORY),
+                repository=config.get("DAZEL_REPOSITORY", DEFAULT_REMOTE_REPOSITORY),
                 directory=config.get("DAZEL_DIRECTORY", DEFAULT_DIRECTORY),
                 command=config.get("DAZEL_COMMAND", DEFAULT_COMMAND),
                 volumes=config.get("DAZEL_VOLUMES", DEFAULT_VOLUMES),
