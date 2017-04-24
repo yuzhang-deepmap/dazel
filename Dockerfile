@@ -13,7 +13,7 @@ RUN apt-get update \
          /etc/apt/sources.list.d/bazel.list \
  && curl https://storage.googleapis.com/bazel-apt/doc/apt-key.pub.gpg | apt-key add - \
  && apt-get update \
- && apt-get install -y --no-install-recommends bazel=${BAZEL_VERSION} \
+ && apt-get install -y --no-install-recommends -t jessie-backports bazel=${BAZEL_VERSION} \
  && apt-get purge --auto-remove -y curl \
  && rm -rf /etc/apt/sources.list.d/bazel.list \
  && rm -rf /var/lib/apt/lists/*
