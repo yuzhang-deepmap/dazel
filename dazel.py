@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
 import hashlib
+import logging
 import os
+import subprocess
 import sys
 import types
 
@@ -35,6 +37,9 @@ DEFAULT_BAZEL_RC_FILE = ""
 DEFAULT_DOCKER_RUN_PRIVILEGED = False
 DEFAULT_DOCKER_MACHINE = None
 DEFAULT_WORKSPACE_HEX = False
+
+
+logger = logging.getLogger("dazel")
 
 
 class DockerInstance:
@@ -142,7 +147,7 @@ class DockerInstance:
 
         # Verify that the docker executable exists.
         if not self._docker_exists():
-            print ("ERROR: Docker executable could not be found!")
+            logger.error("ERROR: Docker executable could not be found!")
             return 1
 
         # Build or pull the relevant dazel image.
@@ -166,7 +171,7 @@ class DockerInstance:
 
             # Setup the network if necessary.
             if not self._network_exists():
-                print ("Creating network: '%s'" % self.network)
+                logger.info("Creating network: '%s'" % self.network)
                 rc = self._start_network()
             if rc:
                 return rc
@@ -200,15 +205,18 @@ class DockerInstance:
             command += (" && docker inspect \"%s\" | grep '\"NetworkMode\": \"%s\"' >/dev/null 2>&1" %
                         (self.instance_name, self.network))
 
-        rc = os.system(command)
+        rc = self._run_silent_command(command)
         return (rc == 0)
+
+    def _run_silent_command(self, command):
+        return subprocess.call(command, stdout=sys.stderr, shell=True)
 
     def _image_exists(self):
         """Checks if the dazel image exists in the local repository."""
         command = "docker images | grep \"\\<%s/%s\\>\" >/dev/null 2>&1" % (
             self.repository, self.image_name)
         command = self._with_docker_machine(command)
-        rc = os.system(command)
+        rc = self._run_silent_command(command)
         return (rc == 0)
 
     def _build(self):
@@ -219,7 +227,7 @@ class DockerInstance:
         command = "docker build -t %s/%s -f %s %s" % (
             self.repository, self.image_name, self.dockerfile, self.directory)
         command = self._with_docker_machine(command)
-        return os.system(command)
+        return self._run_silent_command(command)
 
     def _pull(self):
         """Pulls the relevant image from the dockerhub repository."""
@@ -228,14 +236,14 @@ class DockerInstance:
 
         command = "docker pull %s/%s" % (self.repository, self.image_name)
         command = self._with_docker_machine(command)
-        return os.system(command)
+        return self._run_silent_command(command)
 
     def _network_exists(self):
         """Checks if the network we need to use exists."""
         command = "docker network ls | grep \"\\<%s\\>\" >/dev/null 2>&1" % (
             self.network)
         command = self._with_docker_machine(command)
-        rc = os.system(command)
+        rc = self._run_silent_command(command)
         return (rc == 0)
 
     def _start_network(self):
@@ -245,7 +253,7 @@ class DockerInstance:
 
         command = "docker network create %s" % self.network
         command = self._with_docker_machine(command)
-        return os.system(command)
+        return self._run_silent_command(command)
 
     def _start_run_deps(self):
         """Starts the containers that are marked as runtime dependencies."""
@@ -271,8 +279,8 @@ class DockerInstance:
                 docker_machine=self.docker_machine,
                 dazel_run_file=None)
             if not run_dep_instance.is_running():
-                print ("Starting run dependency: '%s' (name: '%s')" %
-                       (run_dep_image, run_dep_name))
+                logger.info ("Starting run dependency: '%s' (name: '%s')" %
+                             (run_dep_image, run_dep_name))
                 run_dep_instance._run_container()
 
     def _start_compose_services(self):
@@ -290,11 +298,11 @@ class DockerInstance:
             self.docker_compose_project_name, self.docker_compose_file,
             self.docker_compose_services)
         command = self._with_docker_machine(command)
-        return os.system(command)
+        return self._run_silent_command(command)
 
     def _run_container(self):
         """Runs the container itself."""
-        print ("Starting docker container '%s'..." % self.instance_name)
+        logger.info("Starting docker container '%s'..." % self.instance_name)
         command = "docker stop %s >/dev/null 2>&1 ; " % (self.instance_name)
         command += "docker rm %s >/dev/null 2>&1 ; " % (self.instance_name)
         command += "docker run -id --name=%s %s %s %s %s %s %s%s %s" % (
@@ -308,14 +316,14 @@ class DockerInstance:
             self.image_name,
             self.run_command if self.run_command else "")
         command = self._with_docker_machine(command)
-        rc = os.system(command)
+        rc = self._run_silent_command(command)
         if rc:
             return rc
 
         # Touch the dazel run file to change the timestamp.
         if self.dazel_run_file:
             open(self.dazel_run_file, "w").write(self.instance_name + "\n")
-            print ("Done.")
+            logger.info("Done.")
 
         return rc
 
@@ -444,11 +452,11 @@ class DockerInstance:
     def _command_exists(self, cmd):
         """Checks if a command exists on the system."""
         command = "which %s >/dev/null 2>&1" % (cmd)
-        rc = os.system(command)
+        rc = self._run_silent_command(command)
         return (rc == 0)
 
     def _with_docker_machine(self, cmd):
-        if self.docker_machine is None:
+        if self.docker_machine is None or not self._command_exists("docker-machine"):
             return cmd
         return "eval $(docker-machine env %s) && (%s)" % (self.docker_machine, cmd)
 
