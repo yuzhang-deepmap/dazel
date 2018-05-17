@@ -33,7 +33,7 @@ apt-get install docker-ce
 
 ### Install dazel
 ```bash
-pip install dazel
+python setup.py install [--user]
 ```
 
 That's all there is to it.
