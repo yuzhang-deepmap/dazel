@@ -65,7 +65,7 @@ class DockerInstance:
         self.image_name = image_name
         self.run_command = run_command
         self.docker_command = docker_command
-        self.docker_exec_command = docker_command
+        self.docker_exec_command = docker_exec_command
         self.dockerfile = dockerfile
         self.repository = repository
         self.directory = directory
