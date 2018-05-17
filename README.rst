@@ -51,10 +51,7 @@ Install dazel
 ~~~~~~~~~~~~~
 
 .. code:: bash
-
-    pip install dazel
-
-That's all there is to it. Even bazel is not required!
+    python setup.py install [--user]
 
 Configuration
 -------------
@@ -82,6 +79,11 @@ The possible parameters to set are (with their defaults):
 
     # The command to run to invoke docker (can be changed to `nvidia-docker` for GPUs).
     DAZEL_DOCKER_COMMAND="docker"
+
+    # The command used to send a job to a Docker container. Should never be
+    # nvidia-docker. Change the default value if your docker is not under
+    # system path.
+    DAZEL_DOCKER_EXEC_COMMAND="docker"
 
     # The path to the Dockerfile to use to build the dazel image.
     DAZEL_DOCKERFILE="Dockerfile.dazel"  # in DAZEL_DIRECTORY

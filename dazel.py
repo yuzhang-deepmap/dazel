@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 import hashlib
 import logging
@@ -7,7 +7,6 @@ import shutil
 import subprocess
 import sys
 import types
-
 
 DAZEL_RC_FILE = ".dazelrc"
 DAZEL_RUN_FILE = ".dazel_run"
@@ -31,16 +30,15 @@ DEFAULT_DOCKER_COMPOSE_PROJECT_NAME = "dazel"
 DEFAULT_DOCKER_COMPOSE_SERVICES = ""
 
 DEFAULT_DELEGATED_VOLUME = True
-DEFAULT_BAZEL_USER_OUTPUT_ROOT = os.path.expanduser("~/.cache/bazel/_bazel_%s" %
-                                                    os.environ.get("USER", "user"))
-TEMP_BAZEL_OUTPUT_USER_ROOT = ("/var/bazel/workspace/_bazel_%s" %
-                               os.environ.get("USER", "user"))
+DEFAULT_BAZEL_USER_OUTPUT_ROOT = os.path.expanduser(
+    "~/.cache/bazel/_bazel_%s" % os.environ.get("USER", "user"))
+TEMP_BAZEL_OUTPUT_USER_ROOT = (
+    "/var/bazel/workspace/_bazel_%s" % os.environ.get("USER", "user"))
 DEFAULT_BAZEL_USER_OUTPUT_PATHS = ["external", "action_cache", "execroot"]
 DEFAULT_BAZEL_RC_FILE = ""
 DEFAULT_DOCKER_RUN_PRIVILEGED = False
 DEFAULT_DOCKER_MACHINE = None
 DEFAULT_WORKSPACE_HEX = False
-
 
 logger = logging.getLogger("dazel")
 
@@ -53,18 +51,21 @@ class DockerInstance:
     It streams the output directly and blocks until the command finishes.
     """
 
-    def __init__(self, instance_name, image_name, run_command, docker_command, dockerfile,
-                       repository, directory, command, volumes, ports, network,
-                       run_deps, docker_compose_file, docker_compose_command,
-                       docker_compose_project_name, docker_compose_services, bazel_user_output_root,
-                       bazel_rc_file, docker_run_privileged, docker_machine, dazel_run_file,
-                       workspace_hex, delegated_volume):
+    def __init__(self, instance_name, image_name, run_command, docker_command,
+                 docker_exec_command, dockerfile, repository, directory,
+                 command, volumes, ports, network, run_deps,
+                 docker_compose_file, docker_compose_command,
+                 docker_compose_project_name, docker_compose_services,
+                 bazel_user_output_root, bazel_rc_file, docker_run_privileged,
+                 docker_machine, dazel_run_file, workspace_hex,
+                 delegated_volume):
         real_directory = os.path.realpath(directory)
         self.workspace_hex_digest = ""
         self.instance_name = instance_name
         self.image_name = image_name
         self.run_command = run_command
         self.docker_command = docker_command
+        self.docker_exec_command = docker_command
         self.dockerfile = dockerfile
         self.repository = repository
         self.directory = directory
@@ -82,15 +83,19 @@ class DockerInstance:
         self.delegated_volume_flag = ":delegated" if delegated_volume else ""
 
         if workspace_hex:
-            self.workspace_hex_digest = hashlib.md5(real_directory.encode("ascii")).hexdigest()
-            self.instance_name = "%s_%s" % (self.instance_name, self.workspace_hex_digest)
-            self.docker_compose_project_name = "%s%s" % (self.docker_compose_project_name,
-                                                         self.workspace_hex_digest)
+            self.workspace_hex_digest = hashlib.md5(
+                real_directory.encode("ascii")).hexdigest()
+            self.instance_name = "%s_%s" % (self.instance_name,
+                                            self.workspace_hex_digest)
+            self.docker_compose_project_name = "%s%s" % (
+                self.docker_compose_project_name, self.workspace_hex_digest)
             if os.path.exists(self.dockerfile):
-                self.image_name = "%s_%s" % (self.image_name, self.workspace_hex_digest)
+                self.image_name = "%s_%s" % (self.image_name,
+                                             self.workspace_hex_digest)
 
         if self.docker_compose_file:
-            self.network = "%s_%s" % (self.docker_compose_project_name, network)
+            self.network = "%s_%s" % (self.docker_compose_project_name,
+                                      network)
 
         self._add_volumes(volumes)
         self._add_ports(ports)
@@ -102,56 +107,60 @@ class DockerInstance:
         config = cls._config_from_file()
         config.update(cls._config_from_environment())
         return DockerInstance(
-                instance_name=config.get("DAZEL_INSTANCE_NAME", DEFAULT_INSTANCE_NAME),
-                image_name=config.get("DAZEL_IMAGE_NAME", DEFAULT_IMAGE_NAME),
-                run_command=config.get("DAZEL_RUN_COMMAND", DEFAULT_RUN_COMMAND),
-                docker_command=config.get("DAZEL_DOCKER_COMMAND", DEFAULT_DOCKER_COMMAND),
-                dockerfile=config.get("DAZEL_DOCKERFILE", DEFAULT_LOCAL_DOCKERFILE),
-                repository=config.get("DAZEL_REPOSITORY", DEFAULT_REMOTE_REPOSITORY),
-                directory=config.get("DAZEL_DIRECTORY", DEFAULT_DIRECTORY),
-                command=config.get("DAZEL_COMMAND", DEFAULT_COMMAND),
-                volumes=config.get("DAZEL_VOLUMES", DEFAULT_VOLUMES),
-                ports=config.get("DAZEL_PORTS", DEFAULT_PORTS),
-                network=config.get("DAZEL_NETWORK", DEFAULT_NETWORK),
-                run_deps=config.get("DAZEL_RUN_DEPS", DEFAULT_RUN_DEPS),
-                docker_compose_file=config.get("DAZEL_DOCKER_COMPOSE_FILE",
-                                               DEFAULT_DOCKER_COMPOSE_FILE),
-                docker_compose_command=config.get("DAZEL_DOCKER_COMPOSE_COMMAND",
-                                                  DEFAULT_DOCKER_COMPOSE_COMMAND),
-                docker_compose_project_name=config.get("DAZEL_DOCKER_COMPOSE_PROJECT_NAME",
-                                                       DEFAULT_DOCKER_COMPOSE_PROJECT_NAME),
-                docker_compose_services=config.get("DAZEL_DOCKER_COMPOSE_SERVICES",
-                                                   DEFAULT_DOCKER_COMPOSE_SERVICES),
-                bazel_rc_file=config.get("DAZEL_BAZEL_RC_FILE", DEFAULT_BAZEL_RC_FILE),
-                bazel_user_output_root=config.get("DAZEL_BAZEL_USER_OUTPUT_ROOT",
-                                                  DEFAULT_BAZEL_USER_OUTPUT_ROOT),
-                docker_run_privileged=config.get("DAZEL_DOCKER_RUN_PRIVILEGED",
-                                                 DEFAULT_DOCKER_RUN_PRIVILEGED),
-                docker_machine=config.get("DAZEL_DOCKER_MACHINE",
-                                          DEFAULT_DOCKER_MACHINE),
-                dazel_run_file=config.get("DAZEL_RUN_FILE", DAZEL_RUN_FILE),
-                workspace_hex=config.get("DAZEL_WORKSPACE_HEX",
-                                          DEFAULT_WORKSPACE_HEX),
-                delegated_volume=config.get("DAZEL_DELEGATED_VOLUME", "DEFAULT_DELEGATED_VOLUME"),
-        )
+            instance_name=config.get("DAZEL_INSTANCE_NAME",
+                                     DEFAULT_INSTANCE_NAME),
+            image_name=config.get("DAZEL_IMAGE_NAME", DEFAULT_IMAGE_NAME),
+            run_command=config.get("DAZEL_RUN_COMMAND", DEFAULT_RUN_COMMAND),
+            docker_command=config.get("DAZEL_DOCKER_COMMAND",
+                                      DEFAULT_DOCKER_COMMAND),
+            docker_exec_command=config.get("DAZEL_DOCKER_EXEC_COMMAND",
+                                           DEFAULT_DOCKER_COMMAND),
+            dockerfile=config.get("DAZEL_DOCKERFILE",
+                                  DEFAULT_LOCAL_DOCKERFILE),
+            repository=config.get("DAZEL_REPOSITORY",
+                                  DEFAULT_REMOTE_REPOSITORY),
+            directory=config.get("DAZEL_DIRECTORY", DEFAULT_DIRECTORY),
+            command=config.get("DAZEL_COMMAND", DEFAULT_COMMAND),
+            volumes=config.get("DAZEL_VOLUMES", DEFAULT_VOLUMES),
+            ports=config.get("DAZEL_PORTS", DEFAULT_PORTS),
+            network=config.get("DAZEL_NETWORK", DEFAULT_NETWORK),
+            run_deps=config.get("DAZEL_RUN_DEPS", DEFAULT_RUN_DEPS),
+            docker_compose_file=config.get("DAZEL_DOCKER_COMPOSE_FILE",
+                                           DEFAULT_DOCKER_COMPOSE_FILE),
+            docker_compose_command=config.get("DAZEL_DOCKER_COMPOSE_COMMAND",
+                                              DEFAULT_DOCKER_COMPOSE_COMMAND),
+            docker_compose_project_name=config.get(
+                "DAZEL_DOCKER_COMPOSE_PROJECT_NAME",
+                DEFAULT_DOCKER_COMPOSE_PROJECT_NAME),
+            docker_compose_services=config.get(
+                "DAZEL_DOCKER_COMPOSE_SERVICES",
+                DEFAULT_DOCKER_COMPOSE_SERVICES),
+            bazel_rc_file=config.get("DAZEL_BAZEL_RC_FILE",
+                                     DEFAULT_BAZEL_RC_FILE),
+            bazel_user_output_root=config.get("DAZEL_BAZEL_USER_OUTPUT_ROOT",
+                                              DEFAULT_BAZEL_USER_OUTPUT_ROOT),
+            docker_run_privileged=config.get("DAZEL_DOCKER_RUN_PRIVILEGED",
+                                             DEFAULT_DOCKER_RUN_PRIVILEGED),
+            docker_machine=config.get("DAZEL_DOCKER_MACHINE",
+                                      DEFAULT_DOCKER_MACHINE),
+            dazel_run_file=config.get("DAZEL_RUN_FILE", DAZEL_RUN_FILE),
+            workspace_hex=config.get("DAZEL_WORKSPACE_HEX",
+                                     DEFAULT_WORKSPACE_HEX),
+            delegated_volume=config.get("DAZEL_DELEGATED_VOLUME",
+                                        "DEFAULT_DELEGATED_VOLUME"), )
 
     def send_command(self, args):
-        command = "%s exec -i -e COLUMNS=%s -e LINES=%s -e TERM=%s %s %s %s %s %s %s %s" % (
-            self.docker_command,
-            *shutil.get_terminal_size(),
-            os.environ.get("TERM", ""),
-            "-t" if sys.stdout.isatty() else "",
-            "--privileged" if self.docker_run_privileged else "",
-            self.instance_name,
-            self.command,
-            ("--bazelrc=%s" % self.bazel_rc_file
-             if self.bazel_rc_file and self.command else ""),
-            ("--output_user_root=%s --output_base=%s" % (
-                TEMP_BAZEL_OUTPUT_USER_ROOT, self.bazel_output_base)
-             if self.command and self.bazel_output_base
-             else  "--output_user_root=%s" % self.bazel_user_output_root
-                   if self.command and self.bazel_user_output_root
-                   else ""),
+        command = "%s exec -i -e TERM=%s %s %s %s %s %s %s %s" % (
+            self.docker_exec_command, os.environ.get("TERM", ""), "-t"
+            if sys.stdout.isatty() else "", "--privileged"
+            if self.docker_run_privileged else "", self.instance_name,
+            self.command, ("--bazelrc=%s" % self.bazel_rc_file
+                           if self.bazel_rc_file and self.command else ""),
+            ("--output_user_root=%s --output_base=%s" %
+             (TEMP_BAZEL_OUTPUT_USER_ROOT, self.bazel_output_base)
+             if self.command and self.bazel_output_base else
+             "--output_user_root=%s" % self.bazel_user_output_root
+             if self.command and self.bazel_user_output_root else ""),
             '"%s"' % '" "'.join(args))
         command = self._with_docker_machine(command)
         return os.WEXITSTATUS(os.system(command))
@@ -210,16 +219,18 @@ class DockerInstance:
         # correct folder).
         if self.directory:
             real_directory = os.path.realpath(self.directory)
-            command += (" && docker inspect \"%s\" | grep \"%s:%s\" >/dev/null 2>&1" %
-                        (self.instance_name, real_directory, real_directory))
+            command += (
+                " && docker inspect \"%s\" | grep \"%s:%s\" >/dev/null 2>&1" %
+                (self.instance_name, real_directory, real_directory))
 
         # If we have a network, make sure the running container is using the
         # correct network (if not we need to create a new container on the
         # correct network).
         # Note: with proper naming conventions this shouldn't happen much.
         if self.network:
-            command += (" && docker inspect \"%s\" | grep '\"NetworkMode\": \"%s\"' >/dev/null 2>&1" %
-                        (self.instance_name, self.network))
+            command += (
+                " && docker inspect \"%s\" | grep '\"NetworkMode\": \"%s\"' >/dev/null 2>&1"
+                % (self.instance_name, self.network))
 
         rc = self._run_silent_command(command)
         return (rc == 0)
@@ -240,8 +251,11 @@ class DockerInstance:
         if not os.path.exists(self.dockerfile):
             raise RuntimeError("No Dockerfile to build the dazel image from.")
 
-        command = "%s build -t %s/%s -f %s %s" % (
-            self.docker_command, self.repository, self.image_name, self.dockerfile, self.directory)
+        command = "%s build -t %s/%s -f %s %s" % (self.docker_command,
+                                                  self.repository,
+                                                  self.image_name,
+                                                  self.dockerfile,
+                                                  self.directory)
         command = self._with_docker_machine(command)
         return self._run_silent_command(command)
 
@@ -250,7 +264,8 @@ class DockerInstance:
         if not self.repository:
             raise RuntimeError("No repository to pull the dazel image from.")
 
-        command = "%s pull %s/%s" % (self.docker_command, self.repository, self.image_name)
+        command = "%s pull %s/%s" % (self.docker_command, self.repository,
+                                     self.image_name)
         command = self._with_docker_machine(command)
         return self._run_silent_command(command)
 
@@ -297,8 +312,8 @@ class DockerInstance:
                 docker_machine=self.docker_machine,
                 dazel_run_file=None)
             if not run_dep_instance.is_running():
-                logger.info ("Starting run dependency: '%s' (name: '%s')" %
-                             (run_dep_image, run_dep_name))
+                logger.info("Starting run dependency: '%s' (name: '%s')" %
+                            (run_dep_image, run_dep_name))
                 run_dep_instance._run_container()
 
     def _start_compose_services(self):
@@ -307,33 +322,33 @@ class DockerInstance:
             return 0
 
         command = "COMPOSE_PROJECT_NAME=%s %s -f %s pull --ignore-pull-failures %s" % (
-            self.docker_compose_project_name, self.docker_compose_command, self.docker_compose_file,
-            self.docker_compose_services)
+            self.docker_compose_project_name, self.docker_compose_command,
+            self.docker_compose_file, self.docker_compose_services)
         command += " && COMPOSE_PROJECT_NAME=%s %s -f %s build %s" % (
-            self.docker_compose_project_name, self.docker_compose_command, self.docker_compose_file,
-            self.docker_compose_services)
+            self.docker_compose_project_name, self.docker_compose_command,
+            self.docker_compose_file, self.docker_compose_services)
         command += " && COMPOSE_PROJECT_NAME=%s %s -f %s up --force-recreate -d %s" % (
-            self.docker_compose_project_name, self.docker_compose_command, self.docker_compose_file,
-            self.docker_compose_services)
+            self.docker_compose_project_name, self.docker_compose_command,
+            self.docker_compose_file, self.docker_compose_services)
         command = self._with_docker_machine(command)
         return self._run_silent_command(command)
 
     def _run_container(self):
         """Runs the container itself."""
         logger.info("Starting docker container '%s'..." % self.instance_name)
-        command = "%s stop %s >/dev/null 2>&1 ; " % (self.docker_command, self.instance_name)
-        command += "%s rm %s >/dev/null 2>&1 ; " % (self.docker_command, self.instance_name)
+        command = "%s stop %s >/dev/null 2>&1 ; " % (self.docker_command,
+                                                     self.instance_name)
+        command += "%s rm %s >/dev/null 2>&1 ; " % (self.docker_command,
+                                                    self.instance_name)
         command += "%s run -id --name=%s %s %s %s %s %s %s%s %s" % (
-            self.docker_command,
-            self.instance_name,
-            "--privileged" if self.docker_run_privileged else "",
-            ("-w %s" % os.path.realpath(self.directory)) if self.directory else "",
-            self.volumes,
-            self.ports,
-            ("--net=%s" % self.network) if self.network else "",
-            ("%s/" % self.repository) if self.repository else "",
-            self.image_name,
-            self.run_command if self.run_command else "")
+            self.docker_command, self.instance_name, "--privileged"
+            if self.docker_run_privileged else "",
+            ("-w %s" % os.path.realpath(self.directory))
+            if self.directory else "", self.volumes, self.ports,
+            ("--net=%s" % self.network)
+            if self.network else "", ("%s/" % self.repository)
+            if self.repository else "", self.image_name, self.run_command
+            if self.run_command else "")
         command = self._with_docker_machine(command)
         rc = self._run_silent_command(command)
         if rc:
@@ -387,20 +402,24 @@ class DockerInstance:
             user_output_paths = (DEFAULT_BAZEL_USER_OUTPUT_PATHS +
                                  [os.path.basename(real_directory)])
             for user_output_path in user_output_paths:
-              real_user_output_path = os.path.realpath(
-                  os.path.join(self.bazel_output_base,
-                               user_output_path))
-              if not os.path.isdir(real_user_output_path):
-                  os.makedirs(real_user_output_path)
-              volumes += ["%s:%s%s" % (real_user_output_path,
-                                       real_user_output_path,
-                                       self.delegated_volume_flag)]
+                real_user_output_path = os.path.realpath(
+                    os.path.join(self.bazel_output_base, user_output_path))
+                if not os.path.isdir(real_user_output_path):
+                    os.makedirs(real_user_output_path)
+                volumes += [
+                    "%s:%s%s" % (real_user_output_path, real_user_output_path,
+                                 self.delegated_volume_flag)
+                ]
         elif real_bazelout:
-            volumes += ["%s:%s%s" % (real_bazelout, real_bazelout, self.delegated_volume_flag)]
+            volumes += [
+                "%s:%s%s" % (real_bazelout, real_bazelout,
+                             self.delegated_volume_flag)
+            ]
             self.bazel_output_base = real_bazelout
 
         # Make sure the path exists on the host.
-        if self.bazel_user_output_root and not os.path.isdir(self.bazel_user_output_root):
+        if self.bazel_user_output_root and not os.path.isdir(
+                self.bazel_user_output_root):
             os.makedirs(self.bazel_user_output_root)
 
         # Calculate the volumes string.
@@ -440,7 +459,10 @@ class DockerInstance:
         def extract_image_and_instance(run_dep):
             if "::" in run_dep:
                 return tuple(run_dep.split("::"))
-            return (run_dep, self.network + "_" + run_dep.replace("/", "_").replace(":", "_"))
+            return (run_dep,
+                    self.network + "_" + run_dep.replace("/", "_").replace(
+                        ":", "_"))
+
         self.run_deps = [extract_image_and_instance(rd) for rd in run_deps]
 
     def _add_compose_services(self, docker_compose_services):
@@ -453,10 +475,14 @@ class DockerInstance:
         # DAZEL_DOCKER_COMPOSE_SERVICES can be a python iterable or a
         # comma-separated string.
         if isinstance(docker_compose_services, str):
-            docker_compose_services = [s.strip() for s in docker_compose_services.split(",")]
-        elif docker_compose_services and not isinstance(docker_compose_services, types.Iterable):
-            raise RuntimeError("DAZEL_DOCKER_COMPOSE_SERVICES must be comma-separated string "
-                               "or python iterable of strings")
+            docker_compose_services = [
+                s.strip() for s in docker_compose_services.split(",")
+            ]
+        elif docker_compose_services and not isinstance(
+                docker_compose_services, types.Iterable):
+            raise RuntimeError(
+                "DAZEL_DOCKER_COMPOSE_SERVICES must be comma-separated string "
+                "or python iterable of strings")
 
         # Create the actual services string.
         self.docker_compose_services = " ".join(docker_compose_services)
@@ -476,9 +502,11 @@ class DockerInstance:
         return (rc == 0)
 
     def _with_docker_machine(self, cmd):
-        if self.docker_machine is None or not self._command_exists("docker-machine"):
+        if self.docker_machine is None or not self._command_exists(
+                "docker-machine"):
             return cmd
-        return "eval $(docker-machine env %s) && (%s)" % (self.docker_machine, cmd)
+        return "eval $(docker-machine env %s) && (%s)" % (self.docker_machine,
+                                                          cmd)
 
     @classmethod
     def _config_from_file(cls):
@@ -488,20 +516,25 @@ class DockerInstance:
         dazelrc_path = os.environ.get("DAZEL_RC_FILE", local_dazelrc_path)
 
         if not os.path.exists(dazelrc_path):
-            return { "DAZEL_DIRECTORY": os.environ.get("DAZEL_DIRECTORY", directory) }
+            return {
+                "DAZEL_DIRECTORY": os.environ.get("DAZEL_DIRECTORY", directory)
+            }
 
         config = {}
         with open(dazelrc_path, "r") as dazelrc:
-            exec(dazelrc.read(), config)
-        config["DAZEL_DIRECTORY"] = os.environ.get("DAZEL_DIRECTORY", directory)
+            exec (dazelrc.read(), config)
+        config["DAZEL_DIRECTORY"] = os.environ.get("DAZEL_DIRECTORY",
+                                                   directory)
         return config
 
     @classmethod
     def _config_from_environment(cls):
         """Creates a configuration from environment variables."""
-        return { name: value
-                 for (name, value) in os.environ.items()
-                 if name.startswith("DAZEL_") }
+        return {
+            name: value
+            for (name, value) in os.environ.items()
+            if name.startswith("DAZEL_")
+        }
 
     @classmethod
     def _find_workspace_directory(cls):
@@ -510,10 +543,10 @@ class DockerInstance:
         This is done by traversing the directory structure from the given dazel
         directory until we find the WORKSPACE file.
         """
-        directory = os.path.realpath(os.environ.get(
-                "DAZEL_DIRECTORY", DEFAULT_DIRECTORY))
-        while (directory and directory != "/" and
-               not os.path.exists(os.path.join(directory, BAZEL_WORKSPACE_FILE))):
+        directory = os.path.realpath(
+            os.environ.get("DAZEL_DIRECTORY", DEFAULT_DIRECTORY))
+        while (directory and directory != "/" and not os.path.exists(
+                os.path.join(directory, BAZEL_WORKSPACE_FILE))):
             directory = os.path.dirname(directory)
         return directory
 
@@ -523,10 +556,9 @@ def main():
     di = DockerInstance.from_config()
 
     # If there is no .dazel_run file, or it is too old, start the DockerInstance.
-    if (not os.path.exists(di.dazel_run_file) or
-        not di.is_running() or
-        (os.path.exists(di.dockerfile) and
-         os.path.getctime(di.dockerfile) > os.path.getctime(di.dazel_run_file))):
+    if (not os.path.exists(di.dazel_run_file) or not di.is_running() or
+        (os.path.exists(di.dockerfile) and os.path.getctime(di.dockerfile) >
+         os.path.getctime(di.dazel_run_file))):
         rc = di.start()
         if rc:
             return rc
@@ -537,4 +569,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-
