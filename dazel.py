@@ -103,6 +103,12 @@ class DockerInstance:
         self._add_compose_services(docker_compose_services)
 
     @classmethod
+    def get_dockerfile(cls, dockerfile_name):
+        if dockerfile_name.startswith('/'):
+            return dockerfile_name
+        return os.path.join(cls._find_workspace_directory(), dockerfile_name)
+
+    @classmethod
     def from_config(cls):
         config = cls._config_from_file()
         config.update(cls._config_from_environment())
@@ -115,8 +121,8 @@ class DockerInstance:
                                       DEFAULT_DOCKER_COMMAND),
             docker_exec_command=config.get("DAZEL_DOCKER_EXEC_COMMAND",
                                            DEFAULT_DOCKER_COMMAND),
-            dockerfile=config.get("DAZEL_DOCKERFILE",
-                                  DEFAULT_LOCAL_DOCKERFILE),
+            dockerfile=cls.get_dockerfile(
+                config.get("DAZEL_DOCKERFILE", DEFAULT_LOCAL_DOCKERFILE)),
             repository=config.get("DAZEL_REPOSITORY",
                                   DEFAULT_REMOTE_REPOSITORY),
             directory=config.get("DAZEL_DIRECTORY", DEFAULT_DIRECTORY),
